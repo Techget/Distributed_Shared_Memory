@@ -3,24 +3,32 @@
 #include <string.h>
 #include "sm.h"
 
-
-#define DATA_SIZE 512
-
+#define COMMAND_SIZE   64
+#define DATA_SIZE      512
+#define SERVER_NUM     10
 
 void sm_run_prog(int n){
 	FILE *pf;
-
+	int serverID = (n % SERVER_NUM);
 	char data[DATA_SIZE];
-	char *buffer1 = "ssh vina02";
-	pf = popen(buffer1, "w");
+	char command[COMMAND_SIZE]; 
+
+	// clear command buffer
+	memset(command, 0, COMMAND_SIZE);
+
+	sprintf(command, "ssh vina%02d", serverID);
+	pf = popen(command, "w");
 
 	if(!pf){
 		fprintf(stderr, "Could not open.\n");
 		return;
 	}
 
-	char *buffer2 = "cd cs9243;./hello";
-	fprintf(pf, buffer2);
+	// clear command buffer
+	memset(command, 0, COMMAND_SIZE); 
+	sprintf(command, "cd Distributed_Shared_Memory/test;./hello %d", n);
+
+	fprintf(pf, command);
 
 	fgets(data, DATA_SIZE, pf);
 	fprintf(stdout, "-%s-\n", data);
@@ -42,6 +50,8 @@ void sm_fork(int n){
 		}
 		else if(pid == 0){
 			printf("Child (%d): %d\n", i + 1, getpid());
+			sm_run_prog(i);
+
 			exit(0);
 		}
 		else{
