@@ -13,6 +13,12 @@ void sm_node_exit (void) {
 	return;
 }
 
+
+/*
+	Synchronisation between the client processes
+	
+*/
+
 void sm_barrier (void){
 	printf("sm_barrier\n");
 	return;

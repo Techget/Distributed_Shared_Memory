@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "sm.h"
+#include "sm_socket.h"
 
 #define COMMAND_SIZE   64
 #define DATA_SIZE      512
