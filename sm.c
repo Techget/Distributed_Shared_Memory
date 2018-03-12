@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include "sm.h"
-
+#include <sm_socket.h>
 
 
 int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {

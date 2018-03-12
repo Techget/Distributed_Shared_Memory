@@ -38,29 +38,7 @@ void sm_run_prog(int n){
 
 }
 
-void sm_fork(int n){
-	/* ssh to node processes and start client program */
-	printf("sm_fork: %d\n", n);
-	int i, pid;
 
-	for(i=0; i < n; ++i){
-		pid = fork();
-		if(pid < 0){
-			printf("Error\n");
-			exit(1);
-		}
-		else if(pid == 0){
-			printf("Child (%d): %d\n", i + 1, getpid());
-			sm_run_prog(i);
-
-			exit(0);
-		}
-		else{
-			wait(NULL);
-		}
-	}
-	return;
-}
 
 
 int main(int argc, char **argv){
@@ -89,6 +67,27 @@ int main(int argc, char **argv){
 	}/* end while */
 
 
-	sm_fork(n_copy);
+	/*
+		create threads to start multiple servers
+	*/
+	int pid;
+	for(i=0; i < n_copy; ++i){
+		pid = fork();
+		if(pid < 0){
+			printf("Error\n");
+			exit(1);
+		}
+		else if(pid == 0){
+			printf("Child (%d): %d\n", i + 1, getpid());
+			sm_run_prog(i);
+
+			exit(0);
+		}
+		else{
+			wait(NULL);
+		}
+	}
+
+	
 
 }/* end main */

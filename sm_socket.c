@@ -3,9 +3,21 @@
 #include <stdlib.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <sm_socket.h>
 
 
-int smConnectToPeer(){
+/*
+No fixed port numbers
+AF_INET domain
+pass information (hostname, portnumber) as command line argumant
+*/
+
+int sm_create_socket(){
+
+}
+
+
+int sm_connect_to_peer(){
 
 }
 
