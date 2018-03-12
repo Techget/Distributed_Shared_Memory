@@ -18,12 +18,12 @@ void printHelpMsg();
 /*
 *	Build and maintain TCP connection, act like a relay station.
 */
-void childProcessMain(char * log_file, char * executable_file, char ** clnt_program_options);
+void childProcessMain(char * host_name, char * executable_file, char ** clnt_program_options);
 
 /**
 *	Clean up 
 */
-void cleanUp();
+void cleanUp(int n_processes);
 
 
 #endif // _DSM_H
