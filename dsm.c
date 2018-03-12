@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "sm.h"
 
 
@@ -11,6 +12,8 @@ void sm_fork(int n){
 int main(int argc, char **argv){
 	int i = 0;
 	while(i<argc){
+		printf("arg %d : %s\n", i, argv[i]);
+		/*
 		switch(argv){
 			case "-H":
 
@@ -24,8 +27,9 @@ int main(int argc, char **argv){
 					break
 			case "-v": printf("version information\n");
 					break;
-
 		}
+		*/
+		
 		i++;
 	}
 
