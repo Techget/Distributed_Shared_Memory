@@ -163,21 +163,18 @@ int main(int argc , char *argv[]) {
 		fclose(fp);	
 	}
 	
-	printf("allocator sleeping...\n");
-	sleep(10);
-	printf("allocator wake up...\n");
 	/*********** allocator start working ***********/ 
-	// while (*online_remote_node_counter == 0) {
-	// 	// do nothing, wait nodes get connected.
-	// }
-	// while (*online_remote_node_counter > 0) {
+	while (*online_remote_node_counter == 0) {
+		// do nothing, wait nodes get connected.
+	}
+	while (*online_remote_node_counter > 0) {
 
-	// }
+	}
 
 	/*********** clean up resources and exit *************/
 	cleanUp(n_processes);
 	printf("Exiting allocator\n");
-	return 0 ;
+	return 0;
 }
 
 
