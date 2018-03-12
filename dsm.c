@@ -13,7 +13,7 @@ void sm_run_prog(int n){
 	char data[DATA_SIZE];
 	char command[COMMAND_SIZE]; 
 
-	// clear command buffer
+	// Clear command buffer
 	memset(command, 0, COMMAND_SIZE);
 
 	sprintf(command, "ssh vina%02d", serverID);
@@ -24,10 +24,11 @@ void sm_run_prog(int n){
 		return;
 	}
 
-	// clear command buffer
+	// Clear command buffer
 	memset(command, 0, COMMAND_SIZE); 
 	sprintf(command, "cd Distributed_Shared_Memory/test;./hello %d", n);
 
+	// Send command to node hosts
 	fprintf(pf, command);
 
 	fgets(data, DATA_SIZE, pf);
