@@ -16,23 +16,44 @@
 static struct remote_node * remote_node_table;
 static int * online_remote_node_counter;
 static int * latest_step_counter;
-int HOST_NAME_LENTH = 128;
+int HOST_NAME_LENTH = 128; // be careful, the hostname may be longer
+int OPTION_LENTH = 128;
+// int 
+char * LOCALHOST = "localhost";
 
 void printHelpMsg() {
 	printf(" Usage: dsm [OPTION]... EXECUTABLE-FILE NODE-OPTION...\n");
 }
 
 void childProcessMain(char * host_name, 
-	char * executable_file, char ** clnt_program_options) {
+	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {
 	// Side Note, after fork, the pointer also point to the same virtual addr, have 
 	// tested the parameters passed in all accessible.
-	// printf("%s\n", host_name);
-	// printf("%s\n", executable_file);
-	// printf("%s\n", *clnt_program_options);
-	// printf("%s\n", *(clnt_program_options + 1));
-	// printf("online_remote_node_counter: %d\n", *online_remote_node_counter);
+	printf("%s\n", host_name);
+	printf("%s\n", executable_file);
+	printf("online_remote_node_counter: %d\n", *online_remote_node_counter);
+	(*online_remote_node_counter)++; // race condition problem
 
-	/* ssh to remote node or spawn a new process if local host is used*/
+	char execute[128];
+	sprintf(execute, "./%s", executable_file);
+
+	char *argv_remote[] 
+	char * argv_remote[] = (char **)malloc(OPTION_LENTH * sizeof(char));
+	int i = 0;
+	for(i=0; i<n_clnt_program_option; i++) {
+		printf("%s\n", *(clnt_program_options + i));	
+	}
+	
+	/* ssh to remote node or create a new process if localhost is used*/
+	// if (strcmp(host_name, LOCALHOST) == 0) {
+	// 	// start a new local process, fork and execvp
+	// 	if (fork() == 0) {
+	// 		char ** argv_remote = 
+	// 		execvp();
+	// 	}
+	// } else {
+	// 	// ssh
+	// }
 
 	/* build the TCP connection */
 }
@@ -49,7 +70,6 @@ void cleanUp(int n_processes) {
 *
 *	Side Note: functionName: CamelCase, var_name: use_slash
 */
-
 int main(int argc , char *argv[]) {
 
 	char * host_file = NULL;
@@ -57,6 +77,7 @@ int main(int argc , char *argv[]) {
 	char * executable_file = NULL;
 	int n_processes = 1;
 	char ** clnt_program_options = NULL;
+	int n_clnt_program_option = 0;
 	
 	/********** read arguments with getOpt **********/
 	int c; // used to read output of `getopt`
@@ -102,7 +123,9 @@ int main(int argc , char *argv[]) {
 	executable_file = argv[optind];
 
 	if (argv[optind + 1] != NULL) {
-		clnt_program_options = &argv[optind + 1];
+		int index = optind + 1;
+		clnt_program_options = &argv[index];
+		n_clnt_program_option = argc - index;
 	}
 
  	// Determine host_file name
@@ -110,7 +133,7 @@ int main(int argc , char *argv[]) {
 		host_file = "hosts";
 	}
 	if (access(host_file, F_OK) == -1) {
-		host_file = "localhost";
+		host_file = LOCALHOST;
 	}
 
 	/************ create shared memory, for synchronization ************/
@@ -134,7 +157,7 @@ int main(int argc , char *argv[]) {
 
 	/************ fork child processes ************/
 	FILE * fp = NULL;
-	if (strcmp(host_file, "localhost") != 0) {
+	if (strcmp(host_file, LOCALHOST) != 0) {
 		fp = fopen(host_file, "r");
 	}
 	size_t len = 0;
@@ -148,12 +171,17 @@ int main(int argc , char *argv[]) {
 				memset(host_name, 0, HOST_NAME_LENTH*(sizeof(char)));
 				read = getline(&host_name, &len, fp);
 			}
+			char * pos;
+			if ((pos=strchr(host_name, '\n')) != NULL) {
+    			*pos = '\0'; // trim the \n
+			}
 		} else {
-			host_name = "localhost";
+			host_name = LOCALHOST;
 		}
 		
 		if (fork() == 0) {
-	        childProcessMain(host_name, executable_file, clnt_program_options);
+	        childProcessMain(host_name, executable_file, 
+	        	clnt_program_options, n_clnt_program_option);
 	        return 0; //child process do not need to do the following stuff
 	    } else {
 	        // do nothing for now
@@ -162,14 +190,15 @@ int main(int argc , char *argv[]) {
 	if (fp != NULL) {
 		fclose(fp);	
 	}
-	
-	/*********** allocator start working ***********/ 
-	while (*online_remote_node_counter == 0) {
-		// do nothing, wait nodes get connected.
-	}
-	while (*online_remote_node_counter > 0) {
 
-	}
+	sleep(1);
+	/*********** allocator start working ***********/ 
+	// while (*online_remote_node_counter == 0) {
+	// 	// do nothing, wait nodes get connected.
+	// }
+	// while (*online_remote_node_counter > 0) {
+
+	// }
 
 	/*********** clean up resources and exit *************/
 	cleanUp(n_processes);
