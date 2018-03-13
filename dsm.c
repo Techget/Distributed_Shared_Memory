@@ -10,14 +10,14 @@
 #include <sys/wait.h>
 #include <getopt.h>
 #include <ctype.h>
-#include<netdb.h>	//hostent
+#include<netdb.h>
 #include<arpa/inet.h>
 #include <stdlib.h>
 #include <string.h>
 #include "dsm.h"
 
 #define PORT_BASE 10000
-#define HOST_NAME_LENTH 128 // be careful, the hostname may be longer
+#define HOST_NAME_LENTH 128
 #define OPTION_LENTH 128
 #define COMMAND_LENTH 256
 #define LOCALHOST "localhost"
@@ -38,7 +38,7 @@ void childProcessMain(int node_n, char * host_name,
 	int socket_desc, client_sock, read_size;
     struct sockaddr_in server, client;
     char client_message[2000];
-    char ip[15];
+    char ip[16];
     int i = 0;
     int port;
 
@@ -114,23 +114,26 @@ void childProcessMain(int node_n, char * host_name,
 		for(i = 0; i < n_clnt_program_option + n_EXTRA_ARG - 1; i++) {
 			sprintf(command, "%s %s", command, argv_remote[i]);
 		}
-		// puts(command);
-		fprintf(pf, command);
+		fprintf(pf, "%s", command);
 		pclose(pf);
-		exit(EXIT_SUCCESS);
+		// exit(EXIT_SUCCESS);
 	}
 
 	/* wait and build the TCP connection */
 	int c = sizeof(struct sockaddr_in); 
-    //accept connection from an incoming client, block here
+    // may block here for a while
     client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
     if (client_sock < 0) {
         printf("accept failed\n");
         exit(EXIT_FAILURE);
     }
-    //Receive a message from client
+    // fill in the shared info data
+    (*online_remote_node_counter)++;
+    (*(remote_node_table + node_n)).id = node_n;
+    (*(remote_node_table + node_n)).online_flag = 1;
+    (*(remote_node_table + node_n)).synchronization_step = 0;
+
     while((read_size = recv(client_sock, client_message, 2000, 0)) > 0) {
-        //Send the message back to client
         write(client_sock , client_message , strlen(client_message));
     }
 }
@@ -268,16 +271,13 @@ int main(int argc , char *argv[]) {
 		fclose(fp);	
 	}
 
-	sleep(1);
+	sleep(2); // wait for remote node connection
 	/******************* allocator start working *********************/ 
-	// while (*online_remote_node_counter == 0) {
-	// 	// do nothing, wait nodes get connected.
-	// }
-	// while (*online_remote_node_counter > 0) {
+	while (*online_remote_node_counter > 0) {
 
-	// }
+	}
 
-	/***************** clean up resources and exit *******************/
+	/******************* clean up resources and exit *******************/
 	cleanUp(n_processes);
 	printf("Exiting allocator\n");
 	return 0;
