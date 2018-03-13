@@ -43,10 +43,10 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	// remote program args format ./executable [ip] [port] [n_processes] [nid] [option1] [option2]...
 	int socket_desc, client_sock, read_size;
     struct sockaddr_in server, client;
-    char client_message[1000];
     char ip[16];
     int i = 0;
     int port;
+    FILE *pf = NULL; // used for ssh connection
 
     /* create socket */
     socket_desc = socket(AF_INET , SOCK_STREAM , 0);
@@ -102,7 +102,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	}
 	argv_remote[n_clnt_program_option + n_EXTRA_ARG] = NULL; // last element of argv should be NULL
 
-	/* ssh to remote node OR create a new process*/
+	/* ssh to remote node OR create a new process, to connect to this allocator child process*/
 	if (strcmp(host_name, LOCALHOST) == 0) {
 		if (fork() == 0) {
 			execvp(argv_remote[0], argv_remote);
@@ -111,16 +111,23 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		}
 	} else {
 		char command[COMMAND_LENTH]; 
+		memset(command, 0, COMMAND_LENTH);
 		sprintf(command, "ssh %s", host_name);
+
+		pf = popen(command, "w");
+
+		memset(command, 0, COMMAND_LENTH);
 		int i = 0;
 		for(i = 0; i < n_clnt_program_option + n_EXTRA_ARG - 1; i++) { 
 			sprintf(command, "%s %s", command, argv_remote[i]);
 		}
+		printf("command: %s\n", command);
+		fprintf(pf, "%s", command);
 		// execute the command
-		if (system(command) < 0) {
-			printf("Wrong with ssh to remote node and execute function\n");
-			exit(EXIT_FAILURE); 
-		}
+		// if (system(command) < 0) {
+		// 	printf("Wrong with ssh to remote node and execute function\n");
+		// 	exit(EXIT_FAILURE); 
+		// }
 	}
 
 	/* wait and build the TCP connection */
@@ -136,6 +143,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     (*(remote_node_table + node_n)).online_flag = 1;
     (*(remote_node_table + node_n)).synchronization_step = 0;
 
+    char client_message[1000];
     memset(client_message, 0, 1000);
     while((read_size = recv(client_sock, client_message, 2000, 0)) > 0) { // consider use flag MSG_WAITALL
     	printf("server receive message: %s\n", client_message);
@@ -145,6 +153,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     (*online_remote_node_counter)--;
     (*(remote_node_table + node_n)).online_flag = 0;
     printf("remote_node %d exit\n", node_n);
+    pclose(pf);
 }
 
 /*
@@ -263,6 +272,7 @@ int main(int argc , char *argv[]) {
 		}
 		
 		if (fork() == 0) {
+			// fork child process to handle connection with remote node
 	        childProcessMain(i, n_processes, host_name, executable_file, 
 	        	clnt_program_options, n_clnt_program_option);
 	        return 0; //child process do not need to do the following stuff
