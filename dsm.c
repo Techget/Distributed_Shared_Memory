@@ -43,7 +43,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	// remote program args format ./executable [ip] [port] [n_processes] [nid] [option1] [option2]...
 	int socket_desc, client_sock, read_size;
     struct sockaddr_in server, client;
-    char client_message[2000];
+    char client_message[1000];
     char ip[16];
     int i = 0;
     int port;
@@ -74,7 +74,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     server.sin_addr.s_addr = INADDR_ANY;
     port = PORT_BASE + node_n;
     server.sin_port = htons(port);
-     
     while(bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0 
     	&& port < 65535) {
 		port++;
@@ -82,7 +81,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     }
     listen(socket_desc , 3);
 
-    /* prepare the args to execute program on remote node*/
+    /* prepare the args to execute program on remote node/local machine*/
     // extra args are: [./func name] [ip] [port] [n_processes] [nid] [options(doesnot counter)] [NULL]
     // the last parameter must be NULL, that's the standard for argv
 	int n_EXTRA_ARG = 6; 
@@ -117,13 +116,15 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		for(i = 0; i < n_clnt_program_option + n_EXTRA_ARG - 1; i++) { 
 			sprintf(command, "%s %s", command, argv_remote[i]);
 		}
-		int err = system(command);
-		exit(EXIT_SUCCESS); 
+		// execute the command
+		if (system(command) < 0) {
+			printf("Wrong with ssh to remote node and execute function\n");
+			exit(EXIT_FAILURE); 
+		}
 	}
 
 	/* wait and build the TCP connection */
 	int c = sizeof(struct sockaddr_in); 
-    // may block here for a while
     client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
     if (client_sock < 0) {
         printf("accept failed\n");
@@ -135,7 +136,9 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     (*(remote_node_table + node_n)).online_flag = 1;
     (*(remote_node_table + node_n)).synchronization_step = 0;
 
-    while((read_size = recv(client_sock, client_message, 2000, 0)) > 0) {
+    while((read_size = recv(client_sock, client_message, 2000, 0)) > 0) { // consider use flag MSG_WAITALL
+    	printf("server receive message: %s\n", client_message);
+    	sprintf(client_message, "server respond: %s", client_message);
         write(client_sock , client_message , strlen(client_message));
     }
 }
