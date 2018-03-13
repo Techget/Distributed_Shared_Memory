@@ -36,10 +36,9 @@ void cleanUp(int n_processes) {
 	munmap(remote_node_table, sizeof(struct remote_node) * n_processes);
 }
 
-// Side Note, after fork, the pointer also point to the same virtual addr, tested.
 void childProcessMain(int node_n, int n_processes, char * host_name, 
 	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {	
-
+	// Side Note, after fork, the pointer also point to the same virtual addr, tested.
 	// remote program args format ./executable [ip] [port] [n_processes] [nid] [option1] [option2]...
 	int socket_desc, client_sock, read_size;
     struct sockaddr_in server, client;
@@ -138,9 +137,13 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
     memset(client_message, 0, 1000);
     while((read_size = recv(client_sock, client_message, 2000, 0)) > 0) { // consider use flag MSG_WAITALL
-    	printf("server receive message: %s\n", client_message);
-        write(client_sock , client_message , strlen(client_message) + 1);
+    	printf("server receive message: %s with length: %d\n", client_message, strlen(client_message));
+        int temp = send(client_sock , client_message , strlen(client_message) + 1, 0);
+        if (temp < 0) {
+        	printf("didn't send\n");
+        }
         memset(client_message, 0, 1000);
+        printf("server send message\n");
     }
     (*online_remote_node_counter)--;
     (*(remote_node_table + node_n)).online_flag = 0;
@@ -274,11 +277,11 @@ int main(int argc , char *argv[]) {
 		fclose(fp);	
 	}
 
-	// sleep(2); // wait for remote node connection
 	/******************* allocator start working *********************/ 
-	while (*online_remote_node_counter == 0) {}
-	while (*online_remote_node_counter > 0) {
-		// do nothing for now
+	int status = 0;
+	pid_t wpid;
+	while ((wpid = wait(&status)) > 0) {
+		printf("waiting child processes\n");
 	}
 
 	/******************* clean up resources and exit *******************/
