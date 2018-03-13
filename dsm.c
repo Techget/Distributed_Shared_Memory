@@ -16,13 +16,15 @@
 #include <string.h>
 #include "dsm.h"
 
+#define PORT_BASE 10000
+#define HOST_NAME_LENTH 128 // be careful, the hostname may be longer
+#define OPTION_LENTH 128
+#define COMMAND_LENTH 256
+#define LOCALHOST "localhost"
+
 static struct remote_node * remote_node_table;
 static int * online_remote_node_counter;
 static int * latest_step_counter;
-int PORT_BASE = 10000;
-int HOST_NAME_LENTH = 128; // be careful, the hostname may be longer
-int OPTION_LENTH = 128;
-char * LOCALHOST = "localhost";
 
 void printHelpMsg() {
 	printf(" Usage: dsm [OPTION]... EXECUTABLE-FILE NODE-OPTION...\n");
@@ -31,18 +33,16 @@ void printHelpMsg() {
 // Side Note, after fork, the pointer also point to the same virtual addr, tested.
 void childProcessMain(int node_n, char * host_name, 
 	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {	
-	// printf("%s\n", host_name);
-	// printf("online_remote_node_counter: %d\n", *online_remote_node_counter);
-	// (*online_remote_node_counter)++; // race condition problem
-	
-	// args format ./executable [ip] [port] [option1] [option2]...
-	int socket_desc , client_sock , c , read_size;
-    struct sockaddr_in server , client;
+
+	// remote program args format ./executable [ip] [port] [option1] [option2]...
+	int socket_desc, client_sock, read_size;
+    struct sockaddr_in server, client;
     char client_message[2000];
     char ip[15];
     int i = 0;
     int port;
 
+    /* create socket */
     socket_desc = socket(AF_INET , SOCK_STREAM , 0);
     if (socket_desc == -1) {
         printf("Could not create socket");
@@ -55,7 +55,6 @@ void childProcessMain(int node_n, char * host_name,
 	struct hostent *he;
 	struct in_addr **addr_list;		
 	if ((he = gethostbyname(local_hostname)) == NULL) {
-		//gethostbyname failed
 		printf("no ip address obtained\n");
 		exit(EXIT_FAILURE);
 	}
@@ -98,12 +97,41 @@ void childProcessMain(int node_n, char * host_name,
 	if (strcmp(host_name, LOCALHOST) == 0) {
 		if (fork() == 0) {
 			execvp(argv_remote[0], argv_remote);
+			printf("should not reach here, something wrong with local remote process execution\n");
+			exit(EXIT_FAILURE);
 		}
 	} else {
-
+		FILE *pf;
+		char command[COMMAND_LENTH]; 
+		sprintf(command, "ssh %s", argv_remote[1]);
+		pf = popen(command, "w");
+		if(!pf) {
+			printf("Could not ssh to remote node.\n");
+			exit(EXIT_FAILURE);
+		}
+		memset(command, 0, COMMAND_LENTH); 
+		int i = 0;
+		for(i = 0; i < n_clnt_program_option + n_EXTRA_ARG - 1; i++) {
+			sprintf(command, "%s %s", command, argv_remote[i]);
+		}
+		puts(command);
+		pclose(pf);
+		exit(EXIT_SUCCESS);
 	}
 
 	/* wait and build the TCP connection */
+	int c = sizeof(struct sockaddr_in); 
+    //accept connection from an incoming client, block here
+    client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
+    if (client_sock < 0) {
+        printf("accept failed\n");
+        exit(EXIT_FAILURE);
+    }
+    //Receive a message from client
+    while((read_size = recv(client_sock, client_message, 2000, 0)) > 0) {
+        //Send the message back to client
+        write(client_sock , client_message , strlen(client_message));
+    }
 }
 
 void cleanUp(int n_processes) {
