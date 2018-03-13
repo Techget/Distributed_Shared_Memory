@@ -103,7 +103,7 @@ void childProcessMain(int node_n, char * host_name,
 	} else {
 		FILE *pf;
 		char command[COMMAND_LENTH]; 
-		sprintf(command, "ssh %s", argv_remote[1]);
+		sprintf(command, "ssh %s", host_name);
 		pf = popen(command, "w");
 		if(!pf) {
 			printf("Could not ssh to remote node.\n");
