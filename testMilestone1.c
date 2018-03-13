@@ -15,11 +15,12 @@ int main (int argc, char *argv[])
 	}
 
 	printf("nid: %d executing..\n", nid);
-
+	fflush(stdout);
 	sm_barrier();
 	printf("nid: %d, after sm_barrier..\n", nid);
-
+	fflush(stdout);
 	printf("nid: %d, before sm_node_exit..\n", nid);
+	fflush(stdout);
 	sm_node_exit();
 	
 
