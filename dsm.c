@@ -125,11 +125,13 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
 	/* wait and build the TCP connection */
 	int c = sizeof(struct sockaddr_in); 
+	printf("before accept\n");
     client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
     if (client_sock < 0) {
         printf("accept failed\n");
         exit(EXIT_FAILURE);
     }
+    printf("accept successfully\n");
     // fill in the shared info data
     (*online_remote_node_counter)++;
     (*(remote_node_table + node_n)).id = node_n;

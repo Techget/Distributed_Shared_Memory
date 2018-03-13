@@ -26,12 +26,14 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
 
     *nodes = atoi(*argv[3]);
     *nid = atoi(*argv[4]);
- 
+ 	printf("in sm_node_init here1 \n");
     //Connect to remote server
     if (connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0) {
         printf("connect failed. Error\n");
         return -1;
     }
+
+    printf("in sm_node_init here2 \n");
 
     /* remove the extra args from argv */
     // pass....
