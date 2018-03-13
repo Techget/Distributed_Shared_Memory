@@ -18,7 +18,6 @@ static int * online_remote_node_counter;
 static int * latest_step_counter;
 int HOST_NAME_LENTH = 128; // be careful, the hostname may be longer
 int OPTION_LENTH = 128;
-// int 
 char * LOCALHOST = "localhost";
 
 void printHelpMsg() {
@@ -27,33 +26,42 @@ void printHelpMsg() {
 
 void childProcessMain(char * host_name, 
 	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {
-	// Side Note, after fork, the pointer also point to the same virtual addr, have 
-	// tested the parameters passed in all accessible.
-	printf("%s\n", host_name);
-	printf("%s\n", executable_file);
-	printf("online_remote_node_counter: %d\n", *online_remote_node_counter);
-	(*online_remote_node_counter)++; // race condition problem
-
-	char execute[128];
-	sprintf(execute, "./%s", executable_file);
-
-	char *argv_remote[] 
-	char * argv_remote[] = (char **)malloc(OPTION_LENTH * sizeof(char));
-	int i = 0;
-	for(i=0; i<n_clnt_program_option; i++) {
-		printf("%s\n", *(clnt_program_options + i));	
-	}
+	// Side Note, after fork, the pointer also point to the same virtual addr, tested.
+	// printf("%s\n", host_name);
+	// printf("online_remote_node_counter: %d\n", *online_remote_node_counter);
+	// (*online_remote_node_counter)++; // race condition problem
+	
+	// int i = 0;
+	// char **argv_remote = (char**) malloc(n_clnt_program_option+2 * sizeof(char*));
+	// for ( i = 0; i < (n_clnt_program_option+2); i++ ) {
+	//     argv_remote[i] = (char*) malloc(OPTION_LENTH * sizeof(char));
+	// }
+	// sprintf(argv_remote[0], "./%s", executable_file);
+	// for(i=0; i<n_clnt_program_option; i++) {
+	// 	memcpy(argv_remote[i+1], *(clnt_program_options + i), strlen(*(clnt_program_options + i)));
+	// }
+	// argv_remote[n_clnt_program_option + 1] = NULL;
+	// execvp(argv_remote[0], argv_remote);
 	
 	/* ssh to remote node or create a new process if localhost is used*/
-	// if (strcmp(host_name, LOCALHOST) == 0) {
-	// 	// start a new local process, fork and execvp
-	// 	if (fork() == 0) {
-	// 		char ** argv_remote = 
-	// 		execvp();
-	// 	}
-	// } else {
-	// 	// ssh
-	// }
+	if (strcmp(host_name, LOCALHOST) == 0) {
+		// start a new local process, fork and execvp
+		if (fork() == 0) {
+			int i = 0;
+			char **argv_remote = (char**) malloc(n_clnt_program_option+2 * sizeof(char*));
+			for ( i = 0; i < (n_clnt_program_option+2); i++ ) {
+			    argv_remote[i] = (char*) malloc(OPTION_LENTH * sizeof(char));
+			}
+			sprintf(argv_remote[0], "./%s", executable_file);
+			for(i=0; i<n_clnt_program_option; i++) {
+				memcpy(argv_remote[i+1], *(clnt_program_options + i), strlen(*(clnt_program_options + i)));
+			}
+			argv_remote[n_clnt_program_option + 1] = NULL;
+			execvp(argv_remote[0], argv_remote);
+		}
+	} else {
+		// ssh
+	}
 
 	/* build the TCP connection */
 }
@@ -191,7 +199,7 @@ int main(int argc , char *argv[]) {
 		fclose(fp);	
 	}
 
-	sleep(1);
+	// sleep(1);
 	/*********** allocator start working ***********/ 
 	// while (*online_remote_node_counter == 0) {
 	// 	// do nothing, wait nodes get connected.
