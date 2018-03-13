@@ -125,23 +125,24 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
 	/* wait and build the TCP connection */
 	int c = sizeof(struct sockaddr_in); 
-	printf("before accept\n");
     client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
     if (client_sock < 0) {
         printf("accept failed\n");
         exit(EXIT_FAILURE);
     }
-    printf("accept successfully\n");
     // fill in the shared info data
     (*online_remote_node_counter)++;
     (*(remote_node_table + node_n)).id = node_n;
     (*(remote_node_table + node_n)).online_flag = 1;
     (*(remote_node_table + node_n)).synchronization_step = 0;
 
+    memset(client_message, 0, 1000);
     while((read_size = recv(client_sock, client_message, 2000, 0)) > 0) { // consider use flag MSG_WAITALL
     	printf("server receive message: %s\n", client_message);
     	sprintf(client_message, "server respond: %s", client_message);
-        write(client_sock , client_message , strlen(client_message));
+    	printf("123 %s\n", client_message);
+        write(client_sock , client_message , strlen(client_message) + 1);
+        memset(client_message, 0, 1000);
     }
 }
 

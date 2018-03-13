@@ -17,24 +17,23 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
     sock = socket(AF_INET , SOCK_STREAM , 0);
     if (sock == -1) {
         printf("Could not create socket\n");
+        fflush(stdout);
         return -1;
     }
 
-    server.sin_addr.s_addr = inet_addr(*argv[1]);
+    // printf("%s\n",(*argv)[1]);
+    server.sin_addr.s_addr = inet_addr((*argv)[1]);
     server.sin_family = AF_INET;
-    server.sin_port = htons(atoi(*argv[2]));
+    server.sin_port = htons(atoi((*argv)[2]));
 
-    *nodes = atoi(*argv[3]);
-    *nid = atoi(*argv[4]);
- 	printf("in sm_node_init here1 \n");
+    *nodes = atoi((*argv)[3]);
+    *nid = atoi((*argv)[4]);
     //Connect to remote server
     if (connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0) {
         printf("connect failed. Error\n");
+        fflush(stdout);
         return -1;
     }
-
-    printf("in sm_node_init here2 \n");
-
     /* remove the extra args from argv */
     // pass....
 
@@ -73,7 +72,7 @@ void sm_node_exit(void) {
 void sm_barrier(void) {
 	char message[1000], server_reply[2000];
 	// message = "sm_barrier message";
-	sprintf(message, "sm_barrier message\n");
+	sprintf(message, "sm_barrier message");
 	send(sock, message, strlen(message) , 0);
 
 	if(recv(sock, server_reply, 2000, 0) < 0) {
