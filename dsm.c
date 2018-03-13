@@ -139,11 +139,11 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     memset(client_message, 0, 1000);
     while((read_size = recv(client_sock, client_message, 2000, 0)) > 0) { // consider use flag MSG_WAITALL
     	printf("server receive message: %s\n", client_message);
-    	sprintf(client_message, "server respond: %s", client_message);
-    	printf("123 %s\n", client_message);
         write(client_sock , client_message , strlen(client_message) + 1);
         memset(client_message, 0, 1000);
     }
+    (*online_remote_node_counter)--;
+    printf("remote_node exit\n");
 }
 
 /*
