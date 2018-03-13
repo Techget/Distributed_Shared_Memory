@@ -18,7 +18,7 @@ void printHelpMsg();
 /*
 *	Build and maintain TCP connection, act like a relay station.
 */
-void childProcessMain(char * host_name, 
+void childProcessMain(int node_n, char * host_name, 
 	char * executable_file, char ** clnt_program_options, int n_clnt_program_option);
 
 /**

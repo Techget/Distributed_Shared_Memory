@@ -16,6 +16,7 @@
 static struct remote_node * remote_node_table;
 static int * online_remote_node_counter;
 static int * latest_step_counter;
+int PORT_BASE = 10000;
 int HOST_NAME_LENTH = 128; // be careful, the hostname may be longer
 int OPTION_LENTH = 128;
 char * LOCALHOST = "localhost";
@@ -24,39 +25,53 @@ void printHelpMsg() {
 	printf(" Usage: dsm [OPTION]... EXECUTABLE-FILE NODE-OPTION...\n");
 }
 
-void childProcessMain(char * host_name, 
+void childProcessMain(int node_n, char * host_name, 
 	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {
 	// Side Note, after fork, the pointer also point to the same virtual addr, tested.
 	// printf("%s\n", host_name);
 	// printf("online_remote_node_counter: %d\n", *online_remote_node_counter);
 	// (*online_remote_node_counter)++; // race condition problem
 	
-	// int i = 0;
-	// char **argv_remote = (char**) malloc(n_clnt_program_option+2 * sizeof(char*));
-	// for ( i = 0; i < (n_clnt_program_option+2); i++ ) {
-	//     argv_remote[i] = (char*) malloc(OPTION_LENTH * sizeof(char));
-	// }
-	// sprintf(argv_remote[0], "./%s", executable_file);
-	// for(i=0; i<n_clnt_program_option; i++) {
-	// 	memcpy(argv_remote[i+1], *(clnt_program_options + i), strlen(*(clnt_program_options + i)));
-	// }
-	// argv_remote[n_clnt_program_option + 1] = NULL;
-	// execvp(argv_remote[0], argv_remote);
-	
-	/* ssh to remote node or create a new process if localhost is used*/
+	int socket_desc , client_sock , c , read_size;
+    struct sockaddr_in server , client;
+    char client_message[2000];
+
+    socket_desc = socket(AF_INET , SOCK_STREAM , 0);
+    if (socket_desc == -1) {
+        printf("Could not create socket");
+        exit(EXIT_FAILURE);
+    }
+
+	/* bind to a specific port first */
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = INADDR_ANY;
+    int port = PORT_BASE + node_n;
+    server.sin_port = htons(port);
+     
+    while(bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0 
+    	&& port < 65535) {
+		port++;
+		server.sin_port = htons(port);	
+    }
+    listen(socket_desc , 3);
+
+    /* prepare the args to execute program on remote node*/
+    int i = 0;
+	int n_EXTRA_ARG = 4;
+	char **argv_remote = (char**)malloc((n_clnt_program_option + n_EXTRA_ARG) * sizeof(char*));
+	for ( i = 0; i < (n_clnt_program_option + n_EXTRA_ARG); i++ ) {
+	    argv_remote[i] = (char*)malloc(OPTION_LENTH * sizeof(char));
+	}
+	sprintf(argv_remote[0], "./%s", executable_file);
+	for(i=0; i<n_clnt_program_option; i++) {
+		memcpy(argv_remote[i+1], *(clnt_program_options + i), 
+			strlen(*(clnt_program_options + i)));
+	}
+	argv_remote[n_clnt_program_option + 1] = NULL;
+	/* ssh to remote node or create a new process*/
 	if (strcmp(host_name, LOCALHOST) == 0) {
 		// start a new local process, fork and execvp
 		if (fork() == 0) {
-			int i = 0;
-			char **argv_remote = (char**) malloc(n_clnt_program_option+2 * sizeof(char*));
-			for ( i = 0; i < (n_clnt_program_option+2); i++ ) {
-			    argv_remote[i] = (char*) malloc(OPTION_LENTH * sizeof(char));
-			}
-			sprintf(argv_remote[0], "./%s", executable_file);
-			for(i=0; i<n_clnt_program_option; i++) {
-				memcpy(argv_remote[i+1], *(clnt_program_options + i), strlen(*(clnt_program_options + i)));
-			}
-			argv_remote[n_clnt_program_option + 1] = NULL;
 			execvp(argv_remote[0], argv_remote);
 		}
 	} else {
@@ -188,7 +203,7 @@ int main(int argc , char *argv[]) {
 		}
 		
 		if (fork() == 0) {
-	        childProcessMain(host_name, executable_file, 
+	        childProcessMain(i, host_name, executable_file, 
 	        	clnt_program_options, n_clnt_program_option);
 	        return 0; //child process do not need to do the following stuff
 	    } else {
@@ -199,7 +214,7 @@ int main(int argc , char *argv[]) {
 		fclose(fp);	
 	}
 
-	// sleep(1);
+	sleep(1);
 	/*********** allocator start working ***********/ 
 	// while (*online_remote_node_counter == 0) {
 	// 	// do nothing, wait nodes get connected.
