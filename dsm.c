@@ -104,19 +104,21 @@ void childProcessMain(int node_n, char * host_name,
 		FILE *pf;
 		char command[COMMAND_LENTH]; 
 		sprintf(command, "ssh %s", host_name);
-		pf = popen(command, "w");
-		if(!pf) {
-			printf("Could not ssh to remote node.\n");
-			exit(EXIT_FAILURE);
-		}
-		memset(command, 0, COMMAND_LENTH); 
+		// pf = popen(command, "w");
+		// if(!pf) {
+		// 	printf("Could not ssh to remote node.\n");
+		// 	exit(EXIT_FAILURE);
+		// }
+		// memset(command, 0, COMMAND_LENTH); 
 		int i = 0;
 		for(i = 0; i < n_clnt_program_option + n_EXTRA_ARG - 1; i++) {
 			sprintf(command, "%s %s", command, argv_remote[i]);
 		}
-		fprintf(pf, "%s", command);
-		pclose(pf);
-		// exit(EXIT_SUCCESS);
+		puts(command);
+		int err = system(command);
+		// fprintf(pf, "%s", command);
+		// pclose(pf);
+		exit(EXIT_SUCCESS); 
 	}
 
 	/* wait and build the TCP connection */
