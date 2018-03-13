@@ -10,8 +10,11 @@
 #include <sys/wait.h>
 #include <getopt.h>
 #include <ctype.h>
+#include<netdb.h>	//hostent
+#include<arpa/inet.h>
+#include <stdlib.h>
+#include <string.h>
 #include "dsm.h"
-
 
 static struct remote_node * remote_node_table;
 static int * online_remote_node_counter;
@@ -25,16 +28,21 @@ void printHelpMsg() {
 	printf(" Usage: dsm [OPTION]... EXECUTABLE-FILE NODE-OPTION...\n");
 }
 
+// Side Note, after fork, the pointer also point to the same virtual addr, tested.
 void childProcessMain(int node_n, char * host_name, 
-	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {
-	// Side Note, after fork, the pointer also point to the same virtual addr, tested.
+	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {	
 	// printf("%s\n", host_name);
 	// printf("online_remote_node_counter: %d\n", *online_remote_node_counter);
 	// (*online_remote_node_counter)++; // race condition problem
 	
+	// args format ./executable [ip] [port] [option1] [option2]...
+
 	int socket_desc , client_sock , c , read_size;
     struct sockaddr_in server , client;
     char client_message[2000];
+    char ip[48];
+    int i = 0;
+    int port;
 
     socket_desc = socket(AF_INET , SOCK_STREAM , 0);
     if (socket_desc == -1) {
@@ -42,10 +50,25 @@ void childProcessMain(int node_n, char * host_name,
         exit(EXIT_FAILURE);
     }
 
+    /* get local ip address */
+ 	char local_hostname[HOST_NAME_LENTH];
+    gethostname(local_hostname, HOST_NAME_LENTH);
+	struct hostent *he;
+	struct in_addr **addr_list;		
+	if ((he = gethostbyname(local_hostname)) == NULL) {
+		//gethostbyname failed
+		printf("no ip address obtained\n");
+		exit(EXIT_FAILURE);
+	}
+	addr_list = (struct in_addr **) he->h_addr_list;
+	for(i = 0; addr_list[i] != NULL; i++) {
+		strcpy(ip , inet_ntoa(*addr_list[i]) );
+	}
+
 	/* bind to a specific port first */
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
-    int port = PORT_BASE + node_n;
+    port = PORT_BASE + node_n;
     server.sin_port = htons(port);
      
     while(bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0 
@@ -56,29 +79,30 @@ void childProcessMain(int node_n, char * host_name,
     listen(socket_desc , 3);
 
     /* prepare the args to execute program on remote node*/
-    int i = 0;
 	int n_EXTRA_ARG = 4;
 	char **argv_remote = (char**)malloc((n_clnt_program_option + n_EXTRA_ARG) * sizeof(char*));
 	for ( i = 0; i < (n_clnt_program_option + n_EXTRA_ARG); i++ ) {
 	    argv_remote[i] = (char*)malloc(OPTION_LENTH * sizeof(char));
 	}
 	sprintf(argv_remote[0], "./%s", executable_file);
+	memcpy(argv_remote[1], ip, strlen(ip));
+	sprintf(argv_remote[2], "%d", port);
+
 	for(i=0; i<n_clnt_program_option; i++) {
-		memcpy(argv_remote[i+1], *(clnt_program_options + i), 
+		memcpy(argv_remote[i+3], *(clnt_program_options + i), 
 			strlen(*(clnt_program_options + i)));
 	}
 	argv_remote[n_clnt_program_option + 1] = NULL;
+
 	/* ssh to remote node or create a new process*/
 	if (strcmp(host_name, LOCALHOST) == 0) {
-		// start a new local process, fork and execvp
 		if (fork() == 0) {
 			execvp(argv_remote[0], argv_remote);
 		}
 	} else {
-		// ssh
 	}
 
-	/* build the TCP connection */
+	/* wait and build the TCP connection */
 }
 
 void cleanUp(int n_processes) {
@@ -102,7 +126,7 @@ int main(int argc , char *argv[]) {
 	char ** clnt_program_options = NULL;
 	int n_clnt_program_option = 0;
 	
-	/********** read arguments with getOpt **********/
+	/**************** read arguments with getOpt ***************/
 	int c; // used to read output of `getopt`
 	while ((c = getopt (argc, argv, "vhl:n:H:")) != -1) {
 		switch (c) {
@@ -178,7 +202,7 @@ int main(int argc , char *argv[]) {
 		MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	*latest_step_counter = 0;
 
-	/************ fork child processes ************/
+	/************************* fork child processes *******************/
 	FILE * fp = NULL;
 	if (strcmp(host_file, LOCALHOST) != 0) {
 		fp = fopen(host_file, "r");
@@ -215,7 +239,7 @@ int main(int argc , char *argv[]) {
 	}
 
 	sleep(1);
-	/*********** allocator start working ***********/ 
+	/******************* allocator start working *********************/ 
 	// while (*online_remote_node_counter == 0) {
 	// 	// do nothing, wait nodes get connected.
 	// }
@@ -223,7 +247,7 @@ int main(int argc , char *argv[]) {
 
 	// }
 
-	/*********** clean up resources and exit *************/
+	/***************** clean up resources and exit *******************/
 	cleanUp(n_processes);
 	printf("Exiting allocator\n");
 	return 0;
