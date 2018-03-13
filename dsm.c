@@ -30,11 +30,17 @@ void printHelpMsg() {
 	printf(" Usage: dsm [OPTION]... EXECUTABLE-FILE NODE-OPTION...\n");
 }
 
+void cleanUp(int n_processes) {
+	munmap(online_remote_node_counter, sizeof(int));
+	munmap(latest_step_counter, sizeof(int));
+	munmap(remote_node_table, sizeof(struct remote_node) * n_processes);
+}
+
 // Side Note, after fork, the pointer also point to the same virtual addr, tested.
-void childProcessMain(int node_n, char * host_name, 
+void childProcessMain(int node_n, int n_processes, char * host_name, 
 	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {	
 
-	// remote program args format ./executable [ip] [port] [option1] [option2]...
+	// remote program args format ./executable [ip] [port] [n_processes] [nid] [option1] [option2]...
 	int socket_desc, client_sock, read_size;
     struct sockaddr_in server, client;
     char client_message[2000];
@@ -77,7 +83,9 @@ void childProcessMain(int node_n, char * host_name,
     listen(socket_desc , 3);
 
     /* prepare the args to execute program on remote node*/
-	int n_EXTRA_ARG = 4;
+    // extra args are: [./func name] [ip] [port] [n_processes] [nid] [options(doesnot counter)] [NULL]
+    // the last parameter must be NULL, that's the standard for argv
+	int n_EXTRA_ARG = 6; 
 	char **argv_remote = (char**)malloc((n_clnt_program_option + n_EXTRA_ARG) * sizeof(char*));
 	for ( i = 0; i < (n_clnt_program_option + n_EXTRA_ARG); i++ ) {
 	    argv_remote[i] = (char*)malloc(OPTION_LENTH * sizeof(char));
@@ -85,15 +93,17 @@ void childProcessMain(int node_n, char * host_name,
 	sprintf(argv_remote[0], "./%s", executable_file);
 	memcpy(argv_remote[1], ip, strlen(ip) + 1);
 	sprintf(argv_remote[2], "%d", port);
+	sprintf(argv_remote[3], "%d", n_processes);
+	sprintf(argv_remote[4], "%d", node_n);
 
 	for(i=0; i<n_clnt_program_option; i++) {
-		memcpy(argv_remote[i+3], 
+		memcpy(argv_remote[i+n_EXTRA_ARG-1], 
 			*(clnt_program_options + i), 
 			strlen(*(clnt_program_options + i)) + 1); // +1 will include '\0'
 	}
-	argv_remote[n_clnt_program_option + n_EXTRA_ARG] = NULL;
+	argv_remote[n_clnt_program_option + n_EXTRA_ARG] = NULL; // last element of argv should be NULL
 
-	/* ssh to remote node or create a new process*/
+	/* ssh to remote node OR create a new process*/
 	if (strcmp(host_name, LOCALHOST) == 0) {
 		if (fork() == 0) {
 			execvp(argv_remote[0], argv_remote);
@@ -101,23 +111,13 @@ void childProcessMain(int node_n, char * host_name,
 			exit(EXIT_FAILURE);
 		}
 	} else {
-		FILE *pf;
 		char command[COMMAND_LENTH]; 
 		sprintf(command, "ssh %s", host_name);
-		// pf = popen(command, "w");
-		// if(!pf) {
-		// 	printf("Could not ssh to remote node.\n");
-		// 	exit(EXIT_FAILURE);
-		// }
-		// memset(command, 0, COMMAND_LENTH); 
 		int i = 0;
-		for(i = 0; i < n_clnt_program_option + n_EXTRA_ARG - 1; i++) {
+		for(i = 0; i < n_clnt_program_option + n_EXTRA_ARG - 1; i++) { 
 			sprintf(command, "%s %s", command, argv_remote[i]);
 		}
-		puts(command);
 		int err = system(command);
-		// fprintf(pf, "%s", command);
-		// pclose(pf);
 		exit(EXIT_SUCCESS); 
 	}
 
@@ -138,12 +138,6 @@ void childProcessMain(int node_n, char * host_name,
     while((read_size = recv(client_sock, client_message, 2000, 0)) > 0) {
         write(client_sock , client_message , strlen(client_message));
     }
-}
-
-void cleanUp(int n_processes) {
-	munmap(online_remote_node_counter, sizeof(int));
-	munmap(latest_step_counter, sizeof(int));
-	munmap(remote_node_table, sizeof(struct remote_node) * n_processes);
 }
 
 /*
@@ -262,7 +256,7 @@ int main(int argc , char *argv[]) {
 		}
 		
 		if (fork() == 0) {
-	        childProcessMain(i, host_name, executable_file, 
+	        childProcessMain(i, n_processes, host_name, executable_file, 
 	        	clnt_program_options, n_clnt_program_option);
 	        return 0; //child process do not need to do the following stuff
 	    } else {
@@ -275,9 +269,9 @@ int main(int argc , char *argv[]) {
 
 	sleep(2); // wait for remote node connection
 	/******************* allocator start working *********************/ 
-	while (*online_remote_node_counter > 0) {
-
-	}
+	// while (*online_remote_node_counter > 0) {
+	// 	// do nothing for now
+	// }
 
 	/******************* clean up resources and exit *******************/
 	cleanUp(n_processes);
