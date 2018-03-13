@@ -270,11 +270,12 @@ int main(int argc , char *argv[]) {
 		fclose(fp);	
 	}
 
-	sleep(2); // wait for remote node connection
+	// sleep(2); // wait for remote node connection
 	/******************* allocator start working *********************/ 
-	// while (*online_remote_node_counter > 0) {
-	// 	// do nothing for now
-	// }
+	while (*online_remote_node_counter == 0) {}
+	while (*online_remote_node_counter > 0) {
+		// do nothing for now
+	}
 
 	/******************* clean up resources and exit *******************/
 	cleanUp(n_processes);
