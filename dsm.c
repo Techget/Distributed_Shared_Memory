@@ -114,7 +114,8 @@ void childProcessMain(int node_n, char * host_name,
 		for(i = 0; i < n_clnt_program_option + n_EXTRA_ARG - 1; i++) {
 			sprintf(command, "%s %s", command, argv_remote[i]);
 		}
-		puts(command);
+		// puts(command);
+		fprintf(pf, command);
 		pclose(pf);
 		exit(EXIT_SUCCESS);
 	}
