@@ -36,11 +36,10 @@ void childProcessMain(int node_n, char * host_name,
 	// (*online_remote_node_counter)++; // race condition problem
 	
 	// args format ./executable [ip] [port] [option1] [option2]...
-
 	int socket_desc , client_sock , c , read_size;
     struct sockaddr_in server , client;
     char client_message[2000];
-    char ip[48];
+    char ip[15];
     int i = 0;
     int port;
 
@@ -62,7 +61,7 @@ void childProcessMain(int node_n, char * host_name,
 	}
 	addr_list = (struct in_addr **) he->h_addr_list;
 	for(i = 0; addr_list[i] != NULL; i++) {
-		strcpy(ip , inet_ntoa(*addr_list[i]) );
+		strcpy(ip , inet_ntoa(*addr_list[i]));
 	}
 
 	/* bind to a specific port first */
@@ -85,14 +84,15 @@ void childProcessMain(int node_n, char * host_name,
 	    argv_remote[i] = (char*)malloc(OPTION_LENTH * sizeof(char));
 	}
 	sprintf(argv_remote[0], "./%s", executable_file);
-	memcpy(argv_remote[1], ip, strlen(ip));
+	memcpy(argv_remote[1], ip, strlen(ip) + 1);
 	sprintf(argv_remote[2], "%d", port);
 
 	for(i=0; i<n_clnt_program_option; i++) {
-		memcpy(argv_remote[i+3], *(clnt_program_options + i), 
-			strlen(*(clnt_program_options + i)));
+		memcpy(argv_remote[i+3], 
+			*(clnt_program_options + i), 
+			strlen(*(clnt_program_options + i)) + 1); // +1 will include '\0'
 	}
-	argv_remote[n_clnt_program_option + 1] = NULL;
+	argv_remote[n_clnt_program_option + n_EXTRA_ARG] = NULL;
 
 	/* ssh to remote node or create a new process*/
 	if (strcmp(host_name, LOCALHOST) == 0) {
@@ -100,6 +100,7 @@ void childProcessMain(int node_n, char * host_name,
 			execvp(argv_remote[0], argv_remote);
 		}
 	} else {
+
 	}
 
 	/* wait and build the TCP connection */
