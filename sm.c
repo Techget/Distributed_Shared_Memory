@@ -66,6 +66,7 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
 
 void sm_node_exit(void) {
 	printf("sm_node_exit..\n");
+	fflush(stdout);
 	close(sock);
 }
 
@@ -77,8 +78,10 @@ void sm_barrier(void) {
 
 	if(recv(sock, server_reply, 2000, 0) < 0) {
 		puts("recv failed");
+		fflush(stdout);
 		return;
 	}
 	puts(server_reply);
+	fflush(stdout);
 }
 
