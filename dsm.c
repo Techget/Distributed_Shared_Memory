@@ -36,6 +36,7 @@ void cleanUp(int n_processes) {
 	munmap(remote_node_table, sizeof(struct remote_node) * n_processes);
 }
 
+
 void childProcessMain(int node_n, int n_processes, char * host_name, 
 	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {	
 	// Side Note, after fork, the pointer also point to the same virtual addr, tested.
