@@ -1,13 +1,6 @@
-CC=gcc
-CFLAGS=-I.
-DEPS = sm.h sm_socket.h
-OBJ = dsm.o sm.o sm_socket.o
+all:
+	gcc -gdwarf-2 dsm.c sm.c -o dsm
+	gcc simple_client.c sm.c -o simple_client
 
-%.o: %.c $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS)
 
-dsm: $(OBJ)
-	gcc -o $@ $^ $(CFLAGS)
-
-clean:
-	rm -f *.o
+#./dsm -H hosts.txt -n 2 Distributed_Shared_Memory/simple_client
