@@ -7,6 +7,8 @@
 #include <fcntl.h> // for open
 #include <unistd.h> // for close
 
+#define DATA_SIZE 1024
+
 static int sock = -1;
 
 int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
@@ -48,9 +50,11 @@ void sm_barrier(void) {
         return;
     }
 
-	char message[1000], server_reply[1000];
+	char message[DATA_SIZE], server_reply[DATA_SIZE];
 	sprintf(message, "sm_barrier message");
 	send(sock, message, strlen(message) , 0);
+
+	
 
 // crux!!!!! why it cannot recv!!!!!
  //    int temp  = recv(sock, server_reply, 1000, 0);
