@@ -56,13 +56,8 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     char ip[16];
     int i = 0;
     int port;
+    port = PORT_BASE + node_n;
 
-    /* create socket */
-    socket_desc = socket(AF_INET , SOCK_STREAM , 0);
-    if (socket_desc == -1) {
-        printf("Could not create socket");
-        exit(EXIT_FAILURE);
-    }
 
     /* get local ip address */
  	char local_hostname[HOST_NAME_LENTH];
@@ -78,17 +73,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		strcpy(ip , inet_ntoa(*addr_list[i]));
 	}
 
-	/* bind to a specific port first */
-    server.sin_family = AF_INET;
-    server.sin_addr.s_addr = INADDR_ANY;
-    port = PORT_BASE + node_n;
-    server.sin_port = htons(port);
-    while(bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0 
-    	&& port < 65535) {
-		port++;
-		server.sin_port = htons(port);	
-    }
-    listen(socket_desc , 3);
+
 
     /* prepare the args to execute program on remote node/local machine*/
     // extra args are: [./func name] [ip] [port] [n_processes] [nid] [options(doesnot counter)] [NULL]
@@ -137,6 +122,23 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	}
 	printf("wait and build the TCP connection*****************************\n");
 	/* wait and build the TCP connection */
+    /* create socket */
+    socket_desc = socket(AF_INET , SOCK_STREAM , 0);
+    if (socket_desc == -1) {
+        printf("Could not create socket");
+        exit(EXIT_FAILURE);
+    }
+	/* bind to a specific port first */
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = INADDR_ANY;
+    server.sin_port = htons(port);
+    while(bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0 
+    	&& port < 65535) {
+		port++;
+		server.sin_port = htons(port);	
+    }
+    listen(socket_desc , 3);
+
 	int c = sizeof(struct sockaddr_in); 
     client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
     if (client_sock < 0) {
@@ -152,37 +154,20 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
     memset(client_message, 0, DATA_SIZE);
 
-	read_size = recv(client_sock, client_message, 2000, 0);
-	printf("server receive message: %s with length: %d\n", client_message, strlen(client_message));
 
-
-	int temp = send(client_sock , client_message , strlen(client_message), 0);  
-
-	if (temp < 0) {
-		printf("didn't send\n");
-	}
-	memset(client_message, 0, DATA_SIZE);
-	printf("server send message\n");
-
-	/*
     while((read_size = recv(client_sock, client_message, 2000, 0)) > 0) { // consider use flag MSG_WAITALL
     	printf("server receive message: %s with length: %d\n", client_message, strlen(client_message));
 
 
+
         int temp = send(client_sock , client_message , strlen(client_message), 0);  
-		
-		int i = 0;   
-		while(temp > 0 && i<10) {
-			temp = send(client_sock , client_message , strlen(client_message), 0);  
-			i++;
- 		}
 		if (temp < 0) {
         	printf("didn't send\n");
         }
         memset(client_message, 0, DATA_SIZE);
         printf("server send message\n");
     }
-	*/
+
 
 
     (*online_remote_node_counter)--;
@@ -285,6 +270,8 @@ int main(int argc , char *argv[]) {
 		MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	*latest_step_counter = 0;
 
+
+
 	/************************* fork child processes *******************/
 	FILE * fp = NULL;
 	if (strcmp(host_file, LOCALHOST) != 0) {
@@ -314,13 +301,14 @@ int main(int argc , char *argv[]) {
 	        	clnt_program_options, n_clnt_program_option);
 	        return 0; //child process do not need to do the following stuff
 	    } else {
-			wait(NULL);
+			//wait(NULL);
 	        // do nothing
 	    }
 	}
 	if (fp != NULL) {
 		fclose(fp);	
 	}
+
 
 
 	/******************* allocator start working *********************/ 

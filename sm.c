@@ -57,8 +57,6 @@ void sm_node_exit(void) {
 
 */
 
-
-
 void sm_barrier(void) {
     if (sock == -1) {
         printf("Run sm_node_init first\n");
