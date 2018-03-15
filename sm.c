@@ -44,7 +44,7 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
 }
 
 void sm_node_exit(void) {
-	printf("sm_node_exit..\n");
+	// printf("sm_node_exit..\n");
 	close(sock);
 }
 
