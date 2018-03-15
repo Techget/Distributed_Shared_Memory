@@ -22,7 +22,7 @@
 
 #define TRUE   1 
 #define FALSE  0 
-#define PORT 10000
+// #define PORT 10000
 
 #define DATA_SIZE 1024
 #define PORT_BASE 10000
@@ -52,7 +52,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	// remote program args format ./executable [ip] [port] [n_processes] [nid] [option1] [option2]...
 	int socket_desc, client_sock, read_size;
     struct sockaddr_in server, client;
-    char client_message[DATA_SIZE];
     char ip[16];
     int i = 0;
     int port;
@@ -126,7 +125,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		for(i = 0; i < n_clnt_program_option + n_EXTRA_ARG - 1; i++) { 
 			sprintf(command, "%s %s", command, argv_remote[i]);
 		}
-		// execute the command
+		// execute the command in a separate process
 		if(fork()==0){
 			if (system(command) < 0) {
 				printf("Wrong with ssh to remote node and execute function\n");
@@ -150,24 +149,22 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     (*(remote_node_table + node_n)).online_flag = 1;
     (*(remote_node_table + node_n)).synchronization_step = 0;
 
-    memset(client_message, 0, DATA_SIZE);
+ //    memset(client_message, 0, DATA_SIZE);
 
-	read_size = recv(client_sock, client_message, 2000, 0);
-	printf("server receive message: %s with length: %d\n", client_message, strlen(client_message));
+	// read_size = recv(client_sock, client_message, 2000, 0);
+	// printf("server receive message: %s with length: %d\n", client_message, strlen(client_message));
 
 
-	int temp = send(client_sock , client_message , strlen(client_message), 0);  
+	// int temp = send(client_sock , client_message , strlen(client_message), 0);  
 
-	if (temp < 0) {
-		printf("didn't send\n");
-	}
-	memset(client_message, 0, DATA_SIZE);
-	printf("server send message\n");
-
-	/*
+	// if (temp < 0) {
+	// 	printf("didn't send\n");
+	// }
+	// memset(client_message, 0, DATA_SIZE);
+	// printf("server send message\n");
+    char client_message[DATA_SIZE];
     while((read_size = recv(client_sock, client_message, 2000, 0)) > 0) { // consider use flag MSG_WAITALL
-    	printf("server receive message: %s with length: %d\n", client_message, strlen(client_message));
-
+    	printf("server receive message: %s with length: %zu\n", client_message, strlen(client_message));
 
         int temp = send(client_sock , client_message , strlen(client_message), 0);  
 		
@@ -182,8 +179,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
         memset(client_message, 0, DATA_SIZE);
         printf("server send message\n");
     }
-	*/
-
 
     (*online_remote_node_counter)--;
     (*(remote_node_table + node_n)).online_flag = 0;
