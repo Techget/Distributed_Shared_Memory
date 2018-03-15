@@ -30,7 +30,7 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
         printf("connect failed. Error\n");
         return -1;
     }
-    printf("build connection successfully\n");
+    //printf("build connection successfully\n");
     /* remove the extra args from argv */
     // pass....
 
@@ -38,7 +38,7 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
 }
 
 void sm_node_exit(void) {
-	printf("sm_node_exit..\n");
+	//printf("sm_node_exit..\n");
 	close(sock);
 }
 
@@ -62,9 +62,9 @@ void sm_barrier(void) {
 	char message[DATA_SIZE], server_reply[DATA_SIZE];
 	sprintf(message, "sm_barrier message!!!");
 	send(sock, message, strlen(message) , 0);
-	printf("client send message: %s\n", message);
+	//printf("client send message: %s\n", message);
 
 	int temp = recv(sock, server_reply, 1000, 0);
-	printf("client receive message: %s\n", server_reply);
+	//printf("client receive message: %s\n", server_reply);
 }
 

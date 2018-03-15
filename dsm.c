@@ -15,6 +15,8 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <unistd.h>  
+#include <semaphore.h>
+
 
 #include "dsm.h"
 
@@ -26,9 +28,13 @@
 #define COMMAND_LENTH 256
 #define LOCALHOST "localhost"
 
+
+
 static struct remote_node * remote_node_table;
-static int * online_remote_node_counter;
-static int * latest_step_counter;
+static int *online_remote_node_counter;
+static int *latest_step_counter;
+
+
 
 void printHelpMsg() {
 	printf(" Usage: dsm [OPTION]... EXECUTABLE-FILE NODE-OPTION...\n");
@@ -40,6 +46,10 @@ void cleanUp(int n_processes) {
 	munmap(remote_node_table, sizeof(struct remote_node) * n_processes);
 }
 
+
+
+
+
 void childProcessMain(int node_n, int n_processes, char * host_name, 
 	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {	
 	// Side Note, after fork, the pointer also point to the same virtual addr, tested.
@@ -49,13 +59,9 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     char ip[16];
     int i = 0;
     int port;
+    port = PORT_BASE + node_n;
 
-    /* create socket */
-    socket_desc = socket(AF_INET , SOCK_STREAM , 0);
-    if (socket_desc == -1) {
-        printf("Could not create socket");
-        exit(EXIT_FAILURE);
-    }
+
 
     /* get local ip address */
  	char local_hostname[HOST_NAME_LENTH];
@@ -71,10 +77,16 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		strcpy(ip , inet_ntoa(*addr_list[i]));
 	}
 
+
+    /* create socket */
+    socket_desc = socket(AF_INET , SOCK_STREAM , 0);
+    if (socket_desc == -1) {
+        printf("Could not create socket");
+        exit(EXIT_FAILURE);
+    }
 	/* bind to a specific port first */
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
-    port = PORT_BASE + node_n;
     server.sin_port = htons(port);
     while(bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0 
     	&& port < 65535) {
@@ -86,16 +98,18 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     /* prepare the args to execute program on remote node/local machine*/
     // extra args are: [./func name] [ip] [port] [n_processes] [nid] [options(doesnot counter)] [NULL]
     // the last parameter must be NULL, that's the standard for argv
-	int n_EXTRA_ARG = 6; 
+	int n_EXTRA_ARG = 8; 
 	char **argv_remote = (char**)malloc((n_clnt_program_option + n_EXTRA_ARG) * sizeof(char*));
 	for ( i = 0; i < (n_clnt_program_option + n_EXTRA_ARG); i++ ) {
 	    argv_remote[i] = (char*)malloc(OPTION_LENTH * sizeof(char));
 	}
-	sprintf(argv_remote[0], "./%s", executable_file);
-	memcpy(argv_remote[1], ip, strlen(ip) + 1);
-	sprintf(argv_remote[2], "%d", port);
-	sprintf(argv_remote[3], "%d", n_processes);
-	sprintf(argv_remote[4], "%d", node_n);
+	sprintf(argv_remote[0], "%s","ssh");
+	sprintf(argv_remote[1], "%s", host_name);
+	sprintf(argv_remote[2], "./%s", executable_file);
+	memcpy(argv_remote[3], ip, strlen(ip) + 1);
+	sprintf(argv_remote[4], "%d", port);
+	sprintf(argv_remote[5], "%d", n_processes);
+	sprintf(argv_remote[6], "%d", node_n);
 
 	for(i=0; i<n_clnt_program_option; i++) {
 		memcpy(argv_remote[i+n_EXTRA_ARG-1], 
@@ -107,24 +121,16 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	/* ssh to remote node OR create a new process*/
 	if (strcmp(host_name, LOCALHOST) == 0) {
 		if (fork() == 0) {
-			execvp(argv_remote[0], argv_remote);
+			execvp(argv_remote[2], &argv_remote[2]);
 			printf("should not reach here, something wrong with local remote process execution\n");
 			exit(EXIT_FAILURE);
 		}
 	} else {
-		char command[COMMAND_LENTH]; 
-		sprintf(command, "ssh %s", host_name);
-		int i = 0;
-		for(i = 0; i < n_clnt_program_option + n_EXTRA_ARG - 1; i++) { 
-			sprintf(command, "%s %s", command, argv_remote[i]);
-		}
 		// execute the command in a separate process
 		if (fork() == 0) {
-			if (system(command) < 0) {
-				printf("Wrong with ssh to remote node and execute function\n");
-				exit(EXIT_FAILURE); 
-			}
-			return;
+			execvp(argv_remote[0], argv_remote);
+			printf("should not reach here, something wrong with local remote process execution\n");
+			exit(EXIT_FAILURE);
 		}
 	}
 	
@@ -144,6 +150,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
     char client_message[DATA_SIZE];
     while(1) {
+
     	int num = recv(client_sock, client_message, 2000, 0);
 		if (num == -1) {
 		        perror("recv");
@@ -156,6 +163,8 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		}
 		client_message[num] = '\0';
 		printf("child-process %d, msg Received %s\n", node_n, client_message);
+
+
 		if ((send(client_sock,client_message, strlen(client_message),0))== -1) 
 		{
 		     fprintf(stderr, "Failure Sending Message\n");
@@ -163,7 +172,24 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		}
 		printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
 			node_n, client_message, strlen(client_message));
+		
 
+		/*	
+
+   		if(recv(client_sock, client_message, 2000, 0)>0){
+
+			printf("child-process %d, msg Received %s\n", node_n, client_message);
+			(*latest_step_counter)++;
+			printf("Num counter: %d\n", *latest_step_counter);
+		}
+
+		if(*latest_step_counter == n_processes){
+			//*latest_step_counter--;
+			send(client_sock,client_message, strlen(client_message),0);
+			printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
+			node_n, client_message, strlen(client_message));
+		}
+		*/
 	}
 
 	close(client_sock);
@@ -266,6 +292,7 @@ int main(int argc , char *argv[]) {
 		MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	*latest_step_counter = 0;
 
+
 	/************************* fork child processes *******************/
 	FILE * fp = NULL;
 	if (strcmp(host_file, LOCALHOST) != 0) {
@@ -291,9 +318,12 @@ int main(int argc , char *argv[]) {
 		}
 		
 		if (fork() == 0) {
+
 	        childProcessMain(i, n_processes, host_name, executable_file, 
 	        	clnt_program_options, n_clnt_program_option);
-	        return 0; //child process do not need to do the following stuff
+
+			exit(0);
+	        //return 0; //child process do not need to do the following stuff
 	    }
 	}
 	if (fp != NULL) {
@@ -306,6 +336,12 @@ int main(int argc , char *argv[]) {
 	while (wait(NULL) > 0) {
 		printf("waiting child processes\n");
 	}
+	
+	/*sleep(10);
+	while(*online_remote_node_counter > 0) {
+		printf("waiting child processes\n");
+	}*/
+
 
 	/******************* clean up resources and exit *******************/
 	cleanUp(n_processes);
