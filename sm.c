@@ -44,6 +44,16 @@ void sm_node_exit(void) {
 	close(sock);
 }
 
+
+
+/*
+	possible solution:
+		remove while in allocator
+
+*/
+
+
+
 void sm_barrier(void) {
     if (sock == -1) {
         printf("Run sm_node_init first\n");
@@ -51,21 +61,19 @@ void sm_barrier(void) {
     }
 
 	char message[DATA_SIZE], server_reply[DATA_SIZE];
-	sprintf(message, "sm_barrier message");
+	sprintf(message, "sm_barrier message!!!");
 	send(sock, message, strlen(message) , 0);
+	printf("client send message: %s\n", message);
 
-	
+	struct timeval tv;
+	tv.tv_sec = 2;
+	tv.tv_usec = 0;
+	setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
 
-// crux!!!!! why it cannot recv!!!!!
- //    int temp  = recv(sock, server_reply, 1000, 0);
- //    printf("%d\n", temp);
-	// if(temp < 0) {
-	// 	printf("recv failed\n");
-	// 	fflush(stdout);
-	// 	return;
-	// }
+	int temp = recv(sock, server_reply, 1000, 0);
+	printf("client receive message: %s\n", server_reply);
 
-	// printf("%s\n",server_reply);
- //    fflush(stdout);
+	close(sock);
+
 }
 

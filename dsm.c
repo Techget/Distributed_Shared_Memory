@@ -16,6 +16,7 @@
 #include <string.h>
 #include "dsm.h"
 
+#define DATA_SIZE 1024
 #define PORT_BASE 10000
 #define HOST_NAME_LENTH 128
 #define OPTION_LENTH 128
@@ -43,7 +44,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	// remote program args format ./executable [ip] [port] [n_processes] [nid] [option1] [option2]...
 	int socket_desc, client_sock, read_size;
     struct sockaddr_in server, client;
-    char client_message[1000];
+    char client_message[DATA_SIZE];
     char ip[16];
     int i = 0;
     int port;
@@ -103,6 +104,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	argv_remote[n_clnt_program_option + n_EXTRA_ARG] = NULL; // last element of argv should be NULL
 
 	/* ssh to remote node OR create a new process*/
+	printf("ssh to remote node OR create a new process*****************************\n");
 	if (strcmp(host_name, LOCALHOST) == 0) {
 		if (fork() == 0) {
 			execvp(argv_remote[0], argv_remote);
@@ -122,7 +124,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			exit(EXIT_FAILURE); 
 		}
 	}
-
+	printf("wait and build the TCP connection*****************************\n");
 	/* wait and build the TCP connection */
 	int c = sizeof(struct sockaddr_in); 
     client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
@@ -130,22 +132,48 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
         printf("accept failed\n");
         exit(EXIT_FAILURE);
     }
+
     // fill in the shared info data
     (*online_remote_node_counter)++;
     (*(remote_node_table + node_n)).id = node_n;
     (*(remote_node_table + node_n)).online_flag = 1;
     (*(remote_node_table + node_n)).synchronization_step = 0;
 
-    memset(client_message, 0, 1000);
+    memset(client_message, 0, DATA_SIZE);
+
+	read_size = recv(client_sock, client_message, 2000, 0);
+	printf("server receive message: %s with length: %d\n", client_message, strlen(client_message));
+
+
+	int temp = send(client_sock , client_message , strlen(client_message), 0);  
+
+	if (temp < 0) {
+		printf("didn't send\n");
+	}
+	memset(client_message, 0, DATA_SIZE);
+	printf("server send message\n");
+
+	/*
     while((read_size = recv(client_sock, client_message, 2000, 0)) > 0) { // consider use flag MSG_WAITALL
     	printf("server receive message: %s with length: %d\n", client_message, strlen(client_message));
-        int temp = send(client_sock , client_message , strlen(client_message) + 1, 0);
-        if (temp < 0) {
+
+
+        int temp = send(client_sock , client_message , strlen(client_message), 0);  
+		
+		int i = 0;   
+		while(temp > 0 && i<10) {
+			temp = send(client_sock , client_message , strlen(client_message), 0);  
+			i++;
+ 		}
+		if (temp < 0) {
         	printf("didn't send\n");
         }
-        memset(client_message, 0, 1000);
+        memset(client_message, 0, DATA_SIZE);
         printf("server send message\n");
     }
+	*/
+
+
     (*online_remote_node_counter)--;
     (*(remote_node_table + node_n)).online_flag = 0;
     printf("remote_node %d exit\n", node_n);
