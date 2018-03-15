@@ -15,7 +15,10 @@ int main (int argc, char *argv[])
 
 	printf("nid: %d executing..\n", nid);
 	sm_barrier();
-	printf("nid: %d, after sm_barrier..\n", nid);
+	printf("nid: %d, after sm_barrier1..\n", nid);
+
+	sm_barrier();
+	printf("nid: %d, after sm_barrier2..\n", nid);
 	printf("nid: %d, before sm_node_exit..\n", nid);
 	sm_node_exit();
 

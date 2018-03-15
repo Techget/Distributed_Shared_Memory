@@ -19,11 +19,6 @@
 #include "dsm.h"
 
 
-
-#define TRUE   1 
-#define FALSE  0 
-// #define PORT 10000
-
 #define DATA_SIZE 1024
 #define PORT_BASE 10000
 #define HOST_NAME_LENTH 128
@@ -44,7 +39,6 @@ void cleanUp(int n_processes) {
 	munmap(latest_step_counter, sizeof(int));
 	munmap(remote_node_table, sizeof(struct remote_node) * n_processes);
 }
-
 
 void childProcessMain(int node_n, int n_processes, char * host_name, 
 	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {	
@@ -111,7 +105,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	argv_remote[n_clnt_program_option + n_EXTRA_ARG] = NULL; // last element of argv should be NULL
 
 	/* ssh to remote node OR create a new process*/
-	printf("ssh to remote node OR create a new process*****************************\n");
 	if (strcmp(host_name, LOCALHOST) == 0) {
 		if (fork() == 0) {
 			execvp(argv_remote[0], argv_remote);
@@ -131,10 +124,10 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 				printf("Wrong with ssh to remote node and execute function\n");
 				exit(EXIT_FAILURE); 
 			}
-			exit(0);
+			return;
 		}
 	}
-	printf("wait and build the TCP connection*****************************\n");
+	
 	/* wait and build the TCP connection */
 	int c = sizeof(struct sockaddr_in); 
     client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
@@ -149,43 +142,24 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     (*(remote_node_table + node_n)).online_flag = 1;
     (*(remote_node_table + node_n)).synchronization_step = 0;
 
- //    memset(client_message, 0, DATA_SIZE);
-
-	// read_size = recv(client_sock, client_message, 2000, 0);
-	// printf("server receive message: %s with length: %d\n", client_message, strlen(client_message));
-
-
-	// int temp = send(client_sock , client_message , strlen(client_message), 0);  
-
-	// if (temp < 0) {
-	// 	printf("didn't send\n");
-	// }
-	// memset(client_message, 0, DATA_SIZE);
-	// printf("server send message\n");
     char client_message[DATA_SIZE];
-    while((read_size = recv(client_sock, client_message, 2000, 0)) > 0) { // consider use flag MSG_WAITALL
-    	printf("server receive message: %s with length: %zu\n", client_message, strlen(client_message));
-
-        int temp = send(client_sock , client_message , strlen(client_message), 0);  
-		
-		int i = 0;   
-		while(temp > 0 && i<10) {
-			temp = send(client_sock , client_message , strlen(client_message), 0);  
-			i++;
- 		}
-		if (temp < 0) {
+    // notice that it will wait the ssh sub-process to end, so that the remote process end first
+    while((read_size = recv(client_sock, client_message, 2000, 0)) > 0 && wait(NULL)>0) { 
+    	printf("child-process %d receive message: %s with length: %zu\n", 
+    		node_n, client_message, strlen(client_message));
+        
+		if (send(client_sock , client_message , strlen(client_message), 0) < 0) {
         	printf("didn't send\n");
         }
+
         memset(client_message, 0, DATA_SIZE);
-        printf("server send message\n");
+        printf("child-process %d send message\n", node_n);
     }
 
     (*online_remote_node_counter)--;
     (*(remote_node_table + node_n)).online_flag = 0;
-    printf("remote_node %d exit\n", node_n);
+    printf("child-process %d exit\n", node_n);
 }
-
-
 
 
 
@@ -309,7 +283,6 @@ int main(int argc , char *argv[]) {
 	        	clnt_program_options, n_clnt_program_option);
 	        return 0; //child process do not need to do the following stuff
 	    } else {
-			wait(NULL);
 	        // do nothing
 	    }
 	}
@@ -319,9 +292,8 @@ int main(int argc , char *argv[]) {
 
 
 	/******************* allocator start working *********************/ 
-	int status = 0;
-	pid_t wpid;
-	while ((wpid = wait(&status)) > 0) {
+	// wait until all the child-process exit
+	while (wait(NULL) > 0) {
 		printf("waiting child processes\n");
 	}
 
