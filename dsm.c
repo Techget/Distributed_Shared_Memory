@@ -119,7 +119,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			sprintf(command, "%s %s", command, argv_remote[i]);
 		}
 		// execute the command in a separate process
-		if(fork()==0){
+		if (fork() == 0) {
 			if (system(command) < 0) {
 				printf("Wrong with ssh to remote node and execute function\n");
 				exit(EXIT_FAILURE); 
@@ -143,22 +143,34 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     (*(remote_node_table + node_n)).synchronization_step = 0;
 
     char client_message[DATA_SIZE];
-    // notice that it will wait the ssh sub-process to end, so that the remote process end first
-    while((read_size = recv(client_sock, client_message, 2000, 0)) > 0 && wait(NULL)>0) { 
-    	printf("child-process %d receive message: %s with length: %zu\n", 
-    		node_n, client_message, strlen(client_message));
-        
-		if (send(client_sock , client_message , strlen(client_message), 0) < 0) {
-        	printf("didn't send\n");
-        }
+    while(1) {
+    	int num = recv(client_sock, client_message, 2000, 0);
+		if (num == -1) {
+		        perror("recv");
+		        exit(1);
+		}
+		else if (num == 0) {
+		        printf("child-process %d Connection closed\n", node_n);
+		        //So I can now wait for another client
+		        break;
+		}
+		client_message[num] = '\0';
+		printf("child-process %d, msg Received %s\n", node_n, client_message);
+		if ((send(client_sock,client_message, strlen(client_message),0))== -1) 
+		{
+		     fprintf(stderr, "Failure Sending Message\n");
+		     break;
+		}
+		printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
+			node_n, client_message, strlen(client_message));
 
-        memset(client_message, 0, DATA_SIZE);
-        printf("child-process %d send message\n", node_n);
-    }
+	}
 
+	close(client_sock);
     (*online_remote_node_counter)--;
     (*(remote_node_table + node_n)).online_flag = 0;
     printf("child-process %d exit\n", node_n);
+    while(wait(NULL)>0) {}
 }
 
 
@@ -282,8 +294,6 @@ int main(int argc , char *argv[]) {
 	        childProcessMain(i, n_processes, host_name, executable_file, 
 	        	clnt_program_options, n_clnt_program_option);
 	        return 0; //child process do not need to do the following stuff
-	    } else {
-	        // do nothing
 	    }
 	}
 	if (fp != NULL) {
@@ -292,7 +302,7 @@ int main(int argc , char *argv[]) {
 
 
 	/******************* allocator start working *********************/ 
-	// wait until all the child-process exit
+	// wait until all the child-process exit, this line must be changed later.
 	while (wait(NULL) > 0) {
 		printf("waiting child processes\n");
 	}
