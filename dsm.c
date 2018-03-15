@@ -132,6 +132,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 				printf("Wrong with ssh to remote node and execute function\n");
 				exit(EXIT_FAILURE); 
 			}
+			exit(0);
 		}
 	}
 	printf("wait and build the TCP connection*****************************\n");
@@ -313,6 +314,7 @@ int main(int argc , char *argv[]) {
 	        	clnt_program_options, n_clnt_program_option);
 	        return 0; //child process do not need to do the following stuff
 	    } else {
+			wait(NULL);
 	        // do nothing
 	    }
 	}
