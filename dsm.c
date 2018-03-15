@@ -14,7 +14,8 @@
 #include <getopt.h>
 #include <netinet/in.h>
 #include <netdb.h>
-#include <unistd.h>  
+#include <unistd.h>
+#include <pthread.h>
 #include <semaphore.h>
 
 
@@ -30,9 +31,41 @@
 
 
 
-static struct remote_node * remote_node_table;
-static int *online_remote_node_counter;
-static int *latest_step_counter;
+static struct Shared* shared;
+
+
+/*********************** Semaphore *******************************/
+
+
+
+void perror_exit (char *s)
+{
+  perror (s);  exit (-1);
+}
+
+void *check_malloc(int size)
+{
+  void *p = malloc (size);
+  if (p == NULL) perror_exit ("malloc failed");
+  return p;
+}
+
+
+Semaphore *make_semaphore (int n)
+{
+	Semaphore *sem = check_malloc (sizeof(Semaphore));
+	int ret = sem_init(sem, 0, n);
+	if (ret == -1) perror_exit ("sem_init failed");
+	return sem;
+}
+
+int sem_signal(Semaphore *sem){
+	return sem_post(sem);
+}
+
+
+
+
 
 
 
@@ -40,18 +73,15 @@ void printHelpMsg() {
 	printf(" Usage: dsm [OPTION]... EXECUTABLE-FILE NODE-OPTION...\n");
 }
 
-void cleanUp(int n_processes) {
-	munmap(online_remote_node_counter, sizeof(int));
-	munmap(latest_step_counter, sizeof(int));
-	munmap(remote_node_table, sizeof(struct remote_node) * n_processes);
+void cleanUp() {
+	munmap(shared, sizeof(struct Shared));
+
 }
 
 
 
-
-
 void childProcessMain(int node_n, int n_processes, char * host_name, 
-	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {	
+	char * executable_file, char ** clnt_program_options, int n_clnt_program_option, Shared *shared) {	
 	// Side Note, after fork, the pointer also point to the same virtual addr, tested.
 	// remote program args format ./executable [ip] [port] [n_processes] [nid] [option1] [option2]...
 	int socket_desc, client_sock, read_size;
@@ -142,15 +172,11 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
         exit(EXIT_FAILURE);
     }
 
-    // fill in the shared info data
-    (*online_remote_node_counter)++;
-    (*(remote_node_table + node_n)).id = node_n;
-    (*(remote_node_table + node_n)).online_flag = 1;
-    (*(remote_node_table + node_n)).synchronization_step = 0;
 
     char client_message[DATA_SIZE];
     while(1) {
 
+		/*
     	int num = recv(client_sock, client_message, 2000, 0);
 		if (num == -1) {
 		        perror("recv");
@@ -172,29 +198,35 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		}
 		printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
 			node_n, client_message, strlen(client_message));
-		
+		*/
 
-		/*	
 
    		if(recv(client_sock, client_message, 2000, 0)>0){
 
 			printf("child-process %d, msg Received %s\n", node_n, client_message);
-			(*latest_step_counter)++;
-			printf("Num counter: %d\n", *latest_step_counter);
+			sem_wait(shared->mutex);
+			shared->counter++;
+			printf("inc counter: %d\n", shared->counter);
+			sem_signal(shared->mutex);
+	
 		}
 
-		if(*latest_step_counter == n_processes){
-			//*latest_step_counter--;
-			send(client_sock,client_message, strlen(client_message),0);
-			printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
-			node_n, client_message, strlen(client_message));
+		if(shared->counter == shared->n){
+			sem_signal(shared->barrier);
 		}
-		*/
+
+		sem_wait(shared->barrier);
+
+		send(client_sock,client_message, strlen(client_message),0);
+		printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
+		node_n, client_message, strlen(client_message));
+
+		sem_signal(shared->barrier);
+
 	}
 
 	close(client_sock);
-    (*online_remote_node_counter)--;
-    (*(remote_node_table + node_n)).online_flag = 0;
+
     printf("child-process %d exit\n", node_n);
     while(wait(NULL)>0) {}
 }
@@ -273,33 +305,25 @@ int main(int argc , char *argv[]) {
 		host_file = LOCALHOST;
 	}
 
-	/************ create shared memory, for synchronization ************/
-	remote_node_table = (struct remote_node *)mmap(NULL, sizeof(struct remote_node) * n_processes, 
-			PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-	int i = 0;
-	for(i=0; i < n_processes; i++) {
-		(*(remote_node_table + i)).id = i;
-		(*(remote_node_table + i)).online_flag = 0;
-		(*(remote_node_table + i)).synchronization_step = 0;
-	}
-
-	online_remote_node_counter = (int *)mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, 
-		MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	*online_remote_node_counter = 0;
-
-	latest_step_counter = (int *)mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, 
-		MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	*latest_step_counter = 0;
-
 
 	/************************* fork child processes *******************/
+	
+
+	shared = (struct Shared *)mmap(NULL, sizeof(struct Shared), 
+	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	
+	(*shared).counter = 0;
+	(*shared).n = n_processes;
+	(*shared).mutex = make_semaphore(1);
+	(*shared).barrier = make_semaphore(0);
+	
+
 	FILE * fp = NULL;
 	if (strcmp(host_file, LOCALHOST) != 0) {
 		fp = fopen(host_file, "r");
 	}
 	size_t len = 0;
-	int r = 0;
+	int i, r = 0;
 	for(i=0; i < n_processes; i++) {
 		char * host_name = (char *)malloc(HOST_NAME_LENTH * sizeof(char));
 		if (fp != NULL) {
@@ -320,7 +344,7 @@ int main(int argc , char *argv[]) {
 		if (fork() == 0) {
 
 	        childProcessMain(i, n_processes, host_name, executable_file, 
-	        	clnt_program_options, n_clnt_program_option);
+	        	clnt_program_options, n_clnt_program_option, shared);
 
 			exit(0);
 	        //return 0; //child process do not need to do the following stuff

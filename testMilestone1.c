@@ -17,8 +17,8 @@ int main (int argc, char *argv[])
 	sm_barrier();
 	printf("nid: %d, after sm_barrier1..\n", nid);
 
-	sm_barrier();
-	printf("nid: %d, after sm_barrier2..\n", nid);
+	//sm_barrier();
+	//printf("nid: %d, after sm_barrier2..\n", nid);
 
 
 	printf("nid: %d, sm_node_exit..\n", nid);
