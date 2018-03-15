@@ -1,20 +1,28 @@
-#include<stdio.h>
-#include<string.h>    
-#include<sys/socket.h>
-#include<arpa/inet.h> 
-#include<unistd.h>    
-#include <netinet/in.h>
+#include <stdio.h>
+#include <string.h> 
 #include <stdlib.h>
+
+#include <sys/socket.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <getopt.h>
+#include <sys/time.h>
+
+#include <arpa/inet.h>
 #include <ctype.h>
-#include<netdb.h>
-#include<arpa/inet.h>
-#include <stdlib.h>
-#include <string.h>
+#include <errno.h> 
+#include <getopt.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <unistd.h>  
+
 #include "dsm.h"
+
+
+
+#define TRUE   1 
+#define FALSE  0 
+#define PORT 10000
 
 #define DATA_SIZE 1024
 #define PORT_BASE 10000
@@ -119,9 +127,11 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			sprintf(command, "%s %s", command, argv_remote[i]);
 		}
 		// execute the command
-		if (system(command) < 0) {
-			printf("Wrong with ssh to remote node and execute function\n");
-			exit(EXIT_FAILURE); 
+		if(fork()==0){
+			if (system(command) < 0) {
+				printf("Wrong with ssh to remote node and execute function\n");
+				exit(EXIT_FAILURE); 
+			}
 		}
 	}
 	printf("wait and build the TCP connection*****************************\n");
@@ -178,6 +188,10 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     (*(remote_node_table + node_n)).online_flag = 0;
     printf("remote_node %d exit\n", node_n);
 }
+
+
+
+
 
 /*
 * 	Connection model basically as following:
@@ -276,15 +290,15 @@ int main(int argc , char *argv[]) {
 		fp = fopen(host_file, "r");
 	}
 	size_t len = 0;
-	int read = 0;
+	int r = 0;
 	for(i=0; i < n_processes; i++) {
 		char * host_name = (char *)malloc(HOST_NAME_LENTH * sizeof(char));
 		if (fp != NULL) {
-			read = getline(&host_name, &len, fp);
-			while (read == -1) {
+			r = getline(&host_name, &len, fp);
+			while (r == -1) {
 				fseek(fp, 0, SEEK_SET);
 				memset(host_name, 0, HOST_NAME_LENTH*(sizeof(char)));
-				read = getline(&host_name, &len, fp);
+				r = getline(&host_name, &len, fp);
 			}
 			char * pos;
 			if ((pos=strchr(host_name, '\n')) != NULL) {
@@ -299,12 +313,13 @@ int main(int argc , char *argv[]) {
 	        	clnt_program_options, n_clnt_program_option);
 	        return 0; //child process do not need to do the following stuff
 	    } else {
-	        // do nothing for now
+	        // do nothing
 	    }
 	}
 	if (fp != NULL) {
 		fclose(fp);	
 	}
+
 
 	/******************* allocator start working *********************/ 
 	int status = 0;
