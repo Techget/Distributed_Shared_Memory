@@ -32,33 +32,26 @@
 
 
 static struct Shared* shared;
-static Semaphore **barrier;
 static int* pids;
 
 /*********************** Semaphore *******************************/
 
-
-
-void perror_exit (char *s)
-{
-  perror (s);  exit (-1);
-}
-
-void *check_malloc(int size)
-{
-  void *p = malloc (size);
-  if (p == NULL) perror_exit ("malloc failed");
-  return p;
-}
-
-
 Semaphore *make_semaphore (int n)
 {
-	Semaphore *sem = check_malloc (sizeof(Semaphore));
+	Semaphore *sem = malloc (sizeof(Semaphore));
+	if (sem == NULL){
+		perror("malloc failed");
+		exit(-1);
+	}
 	int ret = sem_init(sem, 0, n);
-	if (ret == -1) perror_exit ("sem_init failed");
+	if (ret == -1) {
+		perror("sem_init failed");
+		exit(-1);
+	}
 	return sem;
 }
+
+
 
 int sem_signal(Semaphore *sem){
 	return sem_post(sem);
@@ -66,17 +59,13 @@ int sem_signal(Semaphore *sem){
 
 
 
-
-
-
-
 void printHelpMsg() {
 	printf(" Usage: dsm [OPTION]... EXECUTABLE-FILE NODE-OPTION...\n");
 }
 
-void cleanUp() {
+void cleanUp(int n_processes) {
 	munmap(shared, sizeof(struct Shared));
-
+	munmap(pids, sizeof(int)*n_processes);
 }
 
 
@@ -197,21 +186,22 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			printf("child-process %d, start process sm_barrier\n", node_n);
 			sem_wait(shared->mutex);
 			shared->counter++;
-			printf("child-process %d, inc counter: %d\n", node_n, shared->counter);
 			sem_signal(shared->mutex);
 	
 
 			if(shared->counter == shared->n){
 				for(i=0; i<n_processes; ++i){
-					sem_signal(*(barrier+i));
-					kill(*(pids + i), SIGCONT);
+					// send signal to all child to continue from SIGTSTP
+					kill(*(pids + i), SIGCONT); 
 				}
 				shared->counter = 0;
 			}
 
 			printf("child-process %d, wait\n",node_n);
-			if(shared->counter!=0)
+			if(shared->counter!=0){
+				// stop process and wait, do not block itself when counter==0
 				raise(SIGTSTP);
+			}
 
 			printf("child-process %d, after wait\n",node_n);
 
@@ -220,7 +210,12 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
 			node_n, client_message, strlen(client_message));
 
+		}else if(strcmp(client_message, "sm_malloc")==0){
+			continue;
+		}else if(strcmp(client_message, "sm_bcast")==0){
+			continue;
 		}
+
 
 
 
@@ -242,7 +237,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 *	Side Note: functionName: CamelCase, var_name: use_slash
 */
 int main(int argc , char *argv[]) {
-
+	int i;
 	char * host_file = NULL;
 	char * log_file = NULL;
 	char * executable_file = NULL;
@@ -313,24 +308,13 @@ int main(int argc , char *argv[]) {
 
 	shared = (struct Shared *)mmap(NULL, sizeof(struct Shared), 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	
 	(*shared).counter = 0;
 	(*shared).n = n_processes;
 	(*shared).mutex = make_semaphore(1);
 
-	barrier = (Semaphore**)mmap(NULL, sizeof(Semaphore*)*n_processes, 
-	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	int i;
-	for(i=0;i<n_processes; ++i){
-		*(barrier+i)= make_semaphore(0);
-	}
-
 	pids = (int *)mmap(NULL, sizeof(int)* n_processes, 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	
-
-
-
 
 	FILE * fp = NULL;
 	if (strcmp(host_file, LOCALHOST) != 0) {
