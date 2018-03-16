@@ -43,12 +43,6 @@ void sm_node_exit(void) {
 }
 
 
-/*
-	Problem: unable to restart other processes after block
-
-
-
-*/
 void sm_barrier(void) {
     if (sock == -1) {
         printf("Run sm_node_init first\n");

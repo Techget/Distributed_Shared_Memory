@@ -180,31 +180,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
 
     while(1) {
-
-			/*	
-    	int num = recv(client_sock, client_message, 2000, 0);
-		if (num == -1) {
-		        perror("recv");
-		        exit(1);
-		}
-		else if (num == 0) {
-		        printf("child-process %d Connection closed\n", node_n);
-		        //So I can now wait for another client
-		        break;
-		}
-		client_message[num] = '\0';
-		printf("child-process %d, msg Received %s\n", node_n, client_message);
-
-
-		if ((send(client_sock,client_message, strlen(client_message),0))== -1) 
-		{
-		     fprintf(stderr, "Failure Sending Message\n");
-		     break;
-		}
-		printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
-			node_n, client_message, strlen(client_message));
-			*/	
-
 		memset(client_message, 0,DATA_SIZE );
 		int num = recv(client_sock, client_message, DATA_SIZE, 0);
 		if (num == -1) {
@@ -235,19 +210,15 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			}
 
 			printf("child-process %d, wait\n",node_n);
-			raise(SIGTSTP);
-			//sem_wait(*(barrier+node_n));
+			if(shared->counter!=0)
+				raise(SIGTSTP);
+
 			printf("child-process %d, after wait\n",node_n);
+
 
 			send(client_sock,client_message, strlen(client_message),0);
 			printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
 			node_n, client_message, strlen(client_message));
-
-			// inspect semaphore
-			sem_getvalue(*(barrier+1), &sval);
-			printf("node 1 sval: %d \n", sval);
-			sem_getvalue(*(barrier), &sval);
-			printf("node 0 sval: %d \n", sval);	
 
 		}
 
