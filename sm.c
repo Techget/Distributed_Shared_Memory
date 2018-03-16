@@ -30,9 +30,6 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
         printf("connect failed. Error\n");
         return -1;
     }
-    //printf("build connection successfully\n");
-    /* remove the extra args from argv */
-    // pass....
 
     return 0;
 }
@@ -43,6 +40,11 @@ void sm_node_exit(void) {
 }
 
 
+/*
+	Problem: unable to restart other processes after block using semaphore
+
+
+*/
 void sm_barrier(void) {
     if (sock == -1) {
         printf("Run sm_node_init first\n");
