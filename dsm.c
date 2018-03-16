@@ -33,6 +33,7 @@
 
 static struct Shared* shared;
 static Semaphore **barrier;
+static int* pids;
 
 /*********************** Semaphore *******************************/
 
@@ -75,7 +76,7 @@ void printHelpMsg() {
 
 void cleanUp() {
 	munmap(shared, sizeof(struct Shared));
-	munmap(shared, sizeof(struct Shared));
+
 }
 
 
@@ -174,6 +175,10 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
 	int sval;//test
     char client_message[DATA_SIZE];
+
+
+
+
     while(1) {
 
 			/*	
@@ -201,8 +206,15 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			*/	
 
 		memset(client_message, 0,DATA_SIZE );
-   		if(recv(client_sock, client_message, DATA_SIZE, 0)<=0){
-			continue;
+		int num = recv(client_sock, client_message, DATA_SIZE, 0);
+		if (num == -1) {
+		        perror("recv");
+		        exit(1);
+		}
+		else if (num == 0) {
+		        printf("child-process %d Connection closed\n", node_n);
+		        //So I can now wait for another client
+		        break;
 		}
 		printf("child-process %d, msg Received %s\n", node_n, client_message);
 		
@@ -217,16 +229,21 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			if(shared->counter == shared->n){
 				for(i=0; i<n_processes; ++i){
 					sem_signal(*(barrier+i));
+					kill(*(pids + i), SIGCONT);
 				}
 				shared->counter = 0;
 			}
+
 			printf("child-process %d, wait\n",node_n);
-			sem_wait(*(barrier+node_n));
+			raise(SIGTSTP);
+			//sem_wait(*(barrier+node_n));
+			printf("child-process %d, after wait\n",node_n);
 
 			send(client_sock,client_message, strlen(client_message),0);
 			printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
 			node_n, client_message, strlen(client_message));
 
+			// inspect semaphore
 			sem_getvalue(*(barrier+1), &sval);
 			printf("node 1 sval: %d \n", sval);
 			sem_getvalue(*(barrier), &sval);
@@ -337,6 +354,11 @@ int main(int argc , char *argv[]) {
 		*(barrier+i)= make_semaphore(0);
 	}
 
+	pids = (int *)mmap(NULL, sizeof(int)* n_processes, 
+	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	
+
+
 
 
 	FILE * fp = NULL;
@@ -366,7 +388,7 @@ int main(int argc , char *argv[]) {
 
 	        childProcessMain(i, n_processes, host_name, executable_file, 
 	        	clnt_program_options, n_clnt_program_option, shared);
-
+			*(pids + i) = getpid();
 			exit(0);
 	    }
 	}

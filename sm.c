@@ -44,13 +44,9 @@ void sm_node_exit(void) {
 
 
 /*
-	Problem: after ssh, child process have to wait for the client process to exit
-		then it can exit ssh and excute and build TCP connection.
+	Problem: unable to restart other processes after block
 
-	possible solution:
-		1. fork new thread to handle ssh from child, child will handle the connection
-		2. find way to release ssh and leave the client process still running on remote
-			build multithread socket to handle connection
+
 
 */
 void sm_barrier(void) {
