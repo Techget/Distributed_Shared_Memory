@@ -11,7 +11,6 @@ typedef struct Shared{
 	int counter;
 	int n;
 	Semaphore *mutex;
-	Semaphore *barrier;
 }Shared;
 
 

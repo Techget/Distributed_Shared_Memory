@@ -60,7 +60,8 @@ void sm_barrier(void) {
     }
 
 	char message[DATA_SIZE], server_reply[DATA_SIZE];
-	sprintf(message, "sm_barrier message!!!");
+	memset(message, 0, DATA_SIZE);
+	sprintf(message, "sm_barrier");
 	send(sock, message, strlen(message) , 0);
 	//printf("client send message: %s\n", message);
 

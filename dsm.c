@@ -32,7 +32,7 @@
 
 
 static struct Shared* shared;
-
+static Semaphore **barrier;
 
 /*********************** Semaphore *******************************/
 
@@ -75,7 +75,7 @@ void printHelpMsg() {
 
 void cleanUp() {
 	munmap(shared, sizeof(struct Shared));
-
+	munmap(shared, sizeof(struct Shared));
 }
 
 
@@ -172,11 +172,11 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
         exit(EXIT_FAILURE);
     }
 
-
+	int sval;//test
     char client_message[DATA_SIZE];
     while(1) {
 
-		/*
+			/*	
     	int num = recv(client_sock, client_message, 2000, 0);
 		if (num == -1) {
 		        perror("recv");
@@ -198,32 +198,46 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		}
 		printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
 			node_n, client_message, strlen(client_message));
-		*/
+			*/	
 
-
-   		if(recv(client_sock, client_message, 2000, 0)>0){
-
-			printf("child-process %d, msg Received %s\n", node_n, client_message);
+		memset(client_message, 0,DATA_SIZE );
+   		if(recv(client_sock, client_message, DATA_SIZE, 0)<=0){
+			continue;
+		}
+		printf("child-process %d, msg Received %s\n", node_n, client_message);
+		
+		if(strcmp(client_message, "sm_barrier")==0){
+			printf("child-process %d, start process sm_barrier\n", node_n);
 			sem_wait(shared->mutex);
 			shared->counter++;
-			printf("inc counter: %d\n", shared->counter);
+			printf("child-process %d, inc counter: %d\n", node_n, shared->counter);
 			sem_signal(shared->mutex);
 	
+
+			if(shared->counter == shared->n){
+				for(i=0; i<n_processes; ++i){
+					sem_signal(*(barrier+i));
+				}
+				shared->counter = 0;
+			}
+			printf("child-process %d, wait\n",node_n);
+			sem_wait(*(barrier+node_n));
+
+			send(client_sock,client_message, strlen(client_message),0);
+			printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
+			node_n, client_message, strlen(client_message));
+
+			sem_getvalue(*(barrier+1), &sval);
+			printf("node 1 sval: %d \n", sval);
+			sem_getvalue(*(barrier), &sval);
+			printf("node 0 sval: %d \n", sval);	
+
 		}
 
-		if(shared->counter == shared->n){
-			sem_signal(shared->barrier);
-		}
 
-		sem_wait(shared->barrier);
 
-		send(client_sock,client_message, strlen(client_message),0);
-		printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
-		node_n, client_message, strlen(client_message));
 
-		sem_signal(shared->barrier);
-
-	}
+	}/* end while */
 
 	close(client_sock);
 
@@ -315,15 +329,22 @@ int main(int argc , char *argv[]) {
 	(*shared).counter = 0;
 	(*shared).n = n_processes;
 	(*shared).mutex = make_semaphore(1);
-	(*shared).barrier = make_semaphore(0);
-	
+
+	barrier = (Semaphore**)mmap(NULL, sizeof(Semaphore*)*n_processes, 
+	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	int i;
+	for(i=0;i<n_processes; ++i){
+		*(barrier+i)= make_semaphore(0);
+	}
+
+
 
 	FILE * fp = NULL;
 	if (strcmp(host_file, LOCALHOST) != 0) {
 		fp = fopen(host_file, "r");
 	}
 	size_t len = 0;
-	int i, r = 0;
+	int r = 0;
 	for(i=0; i < n_processes; i++) {
 		char * host_name = (char *)malloc(HOST_NAME_LENTH * sizeof(char));
 		if (fp != NULL) {
@@ -347,7 +368,6 @@ int main(int argc , char *argv[]) {
 	        	clnt_program_options, n_clnt_program_option, shared);
 
 			exit(0);
-	        //return 0; //child process do not need to do the following stuff
 	    }
 	}
 	if (fp != NULL) {
@@ -361,10 +381,6 @@ int main(int argc , char *argv[]) {
 		printf("waiting child processes\n");
 	}
 	
-	/*sleep(10);
-	while(*online_remote_node_counter > 0) {
-		printf("waiting child processes\n");
-	}*/
 
 
 	/******************* clean up resources and exit *******************/
