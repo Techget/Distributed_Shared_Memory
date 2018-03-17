@@ -18,8 +18,17 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-
 #include "dsm.h"
+#include "sm_socket.h"
+
+
+//#define DEBUG
+
+#ifdef DEBUG
+# define debug_printf(...) printf( __VA_ARGS__ );
+#else
+# define debug_printf(...) do {} while(0)
+#endif
 
 
 #define DATA_SIZE 1024
@@ -28,8 +37,6 @@
 #define OPTION_LENTH 128
 #define COMMAND_LENTH 256
 #define LOCALHOST "localhost"
-
-
 
 static struct Shared* shared;
 static int* pids;
@@ -81,8 +88,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     int port;
     port = PORT_BASE + node_n;
 
-
-
     /* get local ip address */
  	char local_hostname[HOST_NAME_LENTH];
     gethostname(local_hostname, HOST_NAME_LENTH);
@@ -97,14 +102,12 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		strcpy(ip , inet_ntoa(*addr_list[i]));
 	}
 
-
-    /* create socket */
     socket_desc = socket(AF_INET , SOCK_STREAM , 0);
     if (socket_desc == -1) {
         printf("Could not create socket");
         exit(EXIT_FAILURE);
     }
-	/* bind to a specific port first */
+	//bind to a specific port first
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
     server.sin_port = htons(port);
@@ -176,14 +179,14 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		        exit(1);
 		}
 		else if (num == 0) {
-		        printf("child-process %d Connection closed\n", node_n);
+		        debug_printf("child-process %d Connection closed\n", node_n);
 		        //So I can now wait for another client
 		        break;
 		}
 		printf("child-process %d, msg Received %s\n", node_n, client_message);
 		
 		if(strcmp(client_message, "sm_barrier")==0){
-			printf("child-process %d, start process sm_barrier\n", node_n);
+			debug_printf("child-process %d, start process sm_barrier\n", node_n);
 			sem_wait(shared->mutex);
 			shared->counter++;
 			sem_signal(shared->mutex);
@@ -197,17 +200,17 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 				shared->counter = 0;
 			}
 
-			printf("child-process %d, wait\n",node_n);
+			debug_printf("child-process %d, wait\n",node_n);
 			if(shared->counter!=0){
 				// stop process and wait, do not block itself when counter==0
 				raise(SIGTSTP);
 			}
 
-			printf("child-process %d, after wait\n",node_n);
+			debug_printf("child-process %d, after wait\n",node_n);
 
 
 			send(client_sock,client_message, strlen(client_message),0);
-			printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
+			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
 			node_n, client_message, strlen(client_message));
 
 		}else if(strcmp(client_message, "sm_malloc")==0){
@@ -224,7 +227,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
 	close(client_sock);
 
-    printf("child-process %d exit\n", node_n);
+    debug_printf("child-process %d exit\n", node_n);
     while(wait(NULL)>0) {}
 }
 
@@ -355,14 +358,14 @@ int main(int argc , char *argv[]) {
 	/******************* allocator start working *********************/ 
 	// wait until all the child-process exit, this line must be changed later.
 	while (wait(NULL) > 0) {
-		printf("waiting child processes\n");
+		debug_printf("waiting child processes\n");
 	}
 	
 
 
 	/******************* clean up resources and exit *******************/
 	cleanUp(n_processes);
-	printf("Exiting allocator\n");
+	debug_printf("Exiting allocator\n");
 	return 0;
 }
 

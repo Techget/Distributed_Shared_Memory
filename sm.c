@@ -1,11 +1,11 @@
-#include "sm.h"
 #include <stdio.h>
-#include<string.h>    //strlen
-#include<sys/socket.h>    //socket
-#include<arpa/inet.h> //inet_addr
+#include <string.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
-#include <fcntl.h> // for open
-#include <unistd.h> // for close
+#include <fcntl.h>
+#include <unistd.h>
+#include "sm.h"
 
 #define DATA_SIZE 1024
 
@@ -41,9 +41,6 @@ void sm_node_exit(void) {
 
 
 /*
-	Problem: unable to restart other processes after block using semaphore
-
-
 */
 void sm_barrier(void) {
     if (sock == -1) {
@@ -57,7 +54,7 @@ void sm_barrier(void) {
 	send(sock, message, strlen(message) , 0);
 	//printf("client send message: %s\n", message);
 
-	int temp = recv(sock, server_reply, 1000, 0);
+	int temp = recv(sock, server_reply, DATA_SIZE, 0);
 	//printf("client receive message: %s\n", server_reply);
 }
 
