@@ -1,5 +1,5 @@
 all:
-	gcc -gdwarf-2 -pthread dsm.c sm.c sm_socket.c -o dsm
+	gcc -gdwarf-2 -pthread dsm.c sm.c -o dsm
 	gcc testMilestone1.c sm.c -o testMilestone1
 
 
