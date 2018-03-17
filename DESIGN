@@ -1,0 +1,38 @@
+# Distributed Shared Memory Design
+
+## System Structure
+The Distributed Shared Memory is build around three different components:
+
+- the Allocator process the arguments, creation of child process and allocate shared region for synchronization between child processes.
+
+- the Child processes are forked from the allocator, each child process will manage connection and communication between the corresponding client program. It mamages ssh and TCP connection with client program. 
+
+- Client program interfaces are functions invoked by the client programs. 
+
+
+
+## Allocator Design
+
+* Argument processing
+Argument processing is achieved using getopt
+
+* Create shared region for synchronization
+The child processes are synchronised using Semaphore, it is used when client invokes sm_barrier(), child processes need to wait for each other to execute this function and continue together. 
+
+In order to start together, a table of all child Pid is also shared for sending singal to start process.
+
+* Creation of child process
+
+Child processes are forked from the allocator
+
+## Child Process Design
+
+* 
+
+
+
+## Allocator Design
+
+
+
+
