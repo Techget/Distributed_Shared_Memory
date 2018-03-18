@@ -13,6 +13,11 @@ static int sock = -1;
 
 int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
 	// Pattern: ./executable [ip] [port] [n_processes] [nid] [option1] [option2]...
+    // int i = 0;
+    // for(i=0; i < *argc; i++) {
+    //     printf("%s\n", *argv[i]);
+    // }
+
     struct sockaddr_in server;
     sock = socket(AF_INET , SOCK_STREAM , 0);
     if (sock == -1) {
@@ -31,11 +36,17 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
         return -1;
     }
 
+    // clean up the extra information
+    int i = 1;
+    int extra_arguments = 4;
+    for (i = 1; i+extra_arguments<(*argc)-1; i++) {
+        (*argv)[i] = (*argv)[i+4];
+    }
+    (*argc) -= extra_arguments;
     return 0;
 }
 
 void sm_node_exit(void) {
-	//printf("sm_node_exit..\n");
 	close(sock);
 }
 

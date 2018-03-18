@@ -20,7 +20,7 @@
 
 #include "dsm.h"
 
-//#define DEBUG
+// #define DEBUG
 #ifdef DEBUG
 # define debug_printf(...) printf( __VA_ARGS__ );
 #else
@@ -65,7 +65,7 @@ void printHelpMsg() {
 }
 
 void cleanUp(int n_processes) {
-	sem_destroy(Shared->mutex);
+	// sem_destroy(shared->mutex);
 	munmap(shared, sizeof(struct Shared));
 	munmap(pids, sizeof(int)*n_processes);
 }
@@ -199,7 +199,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			debug_printf("child-process %d, after wait\n",node_n);
 
 			send(client_sock,client_message, strlen(client_message),0);
-			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
+			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
 			node_n, client_message, strlen(client_message));
 		}else if(strcmp(client_message, "sm_malloc")==0){
 			continue;

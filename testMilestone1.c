@@ -12,6 +12,12 @@ int main (int argc, char *argv[])
 		return -1;
 	}
 
+	// make sure that argv is modified, usable by the program.
+	int i = 0;
+	for(i=0; i< argc-1; i++){
+		printf("%s\n",argv[i]);
+	}
+
 	printf("nid: %d, execute sm_barrier\n", nid);
 	sm_barrier();
 	printf("nid: %d, after sm_barrier.........................1\n", nid);
