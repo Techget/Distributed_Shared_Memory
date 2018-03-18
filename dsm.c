@@ -131,7 +131,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	}
 	sprintf(argv_remote[0], "%s","ssh");
 	sprintf(argv_remote[1], "%s", host_name);
-	sprintf(argv_remote[2], "./%s", executable_file);
+	sprintf(argv_remote[2], "%s", executable_file);
 	memcpy(argv_remote[3], ip, strlen(ip) + 1);
 	sprintf(argv_remote[4], "%d", port);
 	sprintf(argv_remote[5], "%d", n_processes);
