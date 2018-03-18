@@ -19,11 +19,8 @@
 #include <semaphore.h>
 
 #include "dsm.h"
-#include "sm_socket.h"
-
 
 //#define DEBUG
-
 #ifdef DEBUG
 # define debug_printf(...) printf( __VA_ARGS__ );
 #else
