@@ -64,8 +64,12 @@ void sm_barrier(void) {
 	sprintf(message, "sm_barrier");
 	send(sock, message, strlen(message) , 0);
 	//printf("client send message: %s\n", message);
-
+	memset(server_reply, 0, DATA_SIZE);
 	int temp = recv(sock, server_reply, DATA_SIZE, 0);
+	if(strcmp(server_reply, message)!=0){
+		printf("sm_barrier error\n");
+		exit(0);
+	}
 	//printf("client receive message: %s\n", server_reply);
 }
 
