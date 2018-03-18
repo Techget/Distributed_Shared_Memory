@@ -193,6 +193,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 				shared->counter = 0;
 				for(i=0; i<n_processes; ++i){
 					// send signal to all child to continue from SIGSTOP
+					if(i==node_n)	continue;
 					kill(*(pids + i), SIGCONT); 
 				}
 			}
