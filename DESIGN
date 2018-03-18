@@ -17,9 +17,9 @@ The Distributed Shared Memory is build around three different components:
 Argument processing is achieved using getopt
 
 ### Create shared region for synchronization
-The child processes are synchronised using Semaphore, it is used when client invokes ```sm_barrier()```, child processes need to wait for each other to execute this function and continue together. 
+The child processes are synchronised using Semaphore, it is used when client invokes ```sm_barrier()```, child processes need to wait for each other to execute this function and continue simultaneously. 
 
-In order to start together, a table of all child Pid is also shared for sending singal to start process.
+In order to start simultaneously, a table of all child Pid is also shared for sending singal to start process.
 
 ### Creation of child process
 
