@@ -13,9 +13,6 @@ typedef struct Shared{
 	Semaphore *mutex;
 }Shared;
 
-
-
-
 struct remote_node {
 	int id;
 	int online_flag;
