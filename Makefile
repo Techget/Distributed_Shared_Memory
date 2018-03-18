@@ -1,6 +1,11 @@
-all:
+all: sm.o
 	gcc -gdwarf-2 -pthread dsm.c sm.c -o dsm
-	gcc testMilestone1.c sm.c -o testMilestone1
+	ar -cvq libsm.a sm.o
+
+clean:
+	rm sm.o
 
 
-#./dsm -H hosts.txt -n 2 Distributed_Shared_Memory/testMilestone1
+
+# gcc -o test test.c -L. -lsm
+#./dsm -H hosts.txt -n 2 Distributed_Shared_Memory/test

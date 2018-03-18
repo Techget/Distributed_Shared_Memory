@@ -183,7 +183,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		        debug_printf("child-process %d Connection closed\n", node_n);
 		        break;
 		}
-		printf("child-process %d, msg Received %s\n", node_n, client_message);
+		debug_printf("child-process %d, msg Received %s\n", node_n, client_message);
 		
 		if(strcmp(client_message, "sm_barrier")==0){
 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
