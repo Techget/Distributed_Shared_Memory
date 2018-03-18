@@ -165,9 +165,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	int sval;//test
     char client_message[DATA_SIZE];
 
-
-
-
     while(1) {
 		memset(client_message, 0,DATA_SIZE );
 		int num = recv(client_sock, client_message, DATA_SIZE, 0);
@@ -188,7 +185,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			shared->counter++;
 			sem_signal(shared->mutex);
 	
-
 			if(shared->counter == shared->n){
 				for(i=0; i<n_processes; ++i){
 					// send signal to all child to continue from SIGTSTP
@@ -205,7 +201,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
 			debug_printf("child-process %d, after wait\n",node_n);
 
-
 			send(client_sock,client_message, strlen(client_message),0);
 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
 			node_n, client_message, strlen(client_message));
@@ -215,10 +210,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		}else if(strcmp(client_message, "sm_bcast")==0){
 			continue;
 		}
-
-
-
-
 
 	}/* end while */
 
