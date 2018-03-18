@@ -69,7 +69,9 @@ void printHelpMsg() {
 }
 
 void cleanUp(int n_processes) {
-	fclose(log_file_fp);
+	if (log_file_fp != NULL) {
+		fclose(log_file_fp);
+	}
 	sem_destroy(shared->mutex);
 	munmap(shared, sizeof(struct Shared));
 	munmap(pids, sizeof(int)*n_processes);
@@ -179,7 +181,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		}
 		else if (num == 0) {
 		        debug_printf("child-process %d Connection closed\n", node_n);
-		        //So I can now wait for another client
 		        break;
 		}
 		printf("child-process %d, msg Received %s\n", node_n, client_message);
@@ -309,7 +310,6 @@ int main(int argc , char *argv[]) {
 	pids = (int *)mmap(NULL, sizeof(int)* n_processes, 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	
-
 	FILE * fp = NULL;
 	if (strcmp(host_file, LOCALHOST) != 0) {
 		fp = fopen(host_file, "r");
