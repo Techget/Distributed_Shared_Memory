@@ -34,7 +34,7 @@ client program can be started in the following two ways:
 Child process will fork a copy of itself and using ```execvp()``` command to execute client program on local machine.
 
 #### On remote machine
-Child process will fork a copy of itself to execute ssh only, this forked process will manage the ssh connection until the client program exits.
+Child process will fork a copy of itself to execute ssh, this forked process will manage the ssh connection until the client program exits.
 
 ### TCP connection
 
