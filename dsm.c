@@ -189,15 +189,15 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
 			sem_wait(shared->mutex);
 			shared->counter++;
-			sem_signal(shared->mutex);
-	
+		
 			if(shared->counter == shared->n){
+				shared->counter = 0;
 				for(i=0; i<n_processes; ++i){
 					// send signal to all child to continue from SIGTSTP
 					kill(*(pids + i), SIGCONT); 
 				}
-				shared->counter = 0;
 			}
+			sem_signal(shared->mutex);
 
 			debug_printf("child-process %d, wait\n",node_n);
 			if(shared->counter!=0){
