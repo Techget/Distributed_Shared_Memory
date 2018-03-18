@@ -65,6 +65,7 @@ void printHelpMsg() {
 }
 
 void cleanUp(int n_processes) {
+	sem_destroy(Shared->mutex);
 	munmap(shared, sizeof(struct Shared));
 	munmap(pids, sizeof(int)*n_processes);
 }
@@ -177,9 +178,9 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		
 		if(strcmp(client_message, "sm_barrier")==0){
 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
-			sem_wait(shared->mutex);
+			// sem_wait(shared->mutex);
 			shared->counter++;
-			sem_signal(shared->mutex);
+			// sem_signal(shared->mutex);
 	
 			if(shared->counter == shared->n){
 				for(i=0; i<n_processes; ++i){
@@ -192,7 +193,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			debug_printf("child-process %d, wait\n",node_n);
 			if(shared->counter!=0){
 				// stop process and wait, do not block itself when counter==0
-				raise(SIGTSTP);
+				raise(SIGSTOP);
 			}
 
 			debug_printf("child-process %d, after wait\n",node_n);

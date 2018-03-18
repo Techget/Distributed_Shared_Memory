@@ -36,7 +36,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 /**
 *	Clean up 
 */
-void cleanUp();
+void cleanUp(int n_processes);
 
 
 #endif // _DSM_H
