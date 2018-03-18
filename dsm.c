@@ -27,7 +27,6 @@
 # define debug_printf(...) do {} while(0)
 #endif
 
-
 #define DATA_SIZE 1024
 #define PORT_BASE 10000
 #define HOST_NAME_LENTH 128
@@ -37,9 +36,9 @@
 
 static struct Shared* shared;
 static int* pids;
+static FILE * log_file_fp;
 
 /*********************** Semaphore *******************************/
-
 Semaphore *make_semaphore (int n)
 {
 	Semaphore *sem = malloc (sizeof(Semaphore));
@@ -59,12 +58,18 @@ int sem_signal(Semaphore *sem){
 	return sem_post(sem);
 }
 
+void write_to_log(const char * s) {
+	if (log_file_fp != NULL) {
+		fprintf(log_file_fp, "%s", s);
+	}
+}
 
 void printHelpMsg() {
 	printf(" Usage: dsm [OPTION]... EXECUTABLE-FILE NODE-OPTION...\n");
 }
 
 void cleanUp(int n_processes) {
+	fclose(log_file_fp);
 	sem_destroy(shared->mutex);
 	munmap(shared, sizeof(struct Shared));
 	munmap(pids, sizeof(int)*n_processes);
@@ -72,7 +77,7 @@ void cleanUp(int n_processes) {
 
 
 void childProcessMain(int node_n, int n_processes, char * host_name, 
-	char * executable_file, char ** clnt_program_options, int n_clnt_program_option, Shared *shared) {	
+	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {	
 	// Side Note, after fork, the pointer also point to the same virtual addr, tested.
 	// remote program args format ./executable [ip] [port] [n_processes] [nid] [option1] [option2]...
 	int socket_desc, client_sock, read_size;
@@ -89,6 +94,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	struct in_addr **addr_list;		
 	if ((he = gethostbyname(local_hostname)) == NULL) {
 		printf("no ip address obtained\n");
+		write_to_log("no ip address obtained\n");
 		exit(EXIT_FAILURE);
 	}
 	addr_list = (struct in_addr **) he->h_addr_list;
@@ -98,7 +104,8 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
     socket_desc = socket(AF_INET , SOCK_STREAM , 0);
     if (socket_desc == -1) {
-        printf("Could not create socket");
+        printf("Could not create socket\n");
+        write_to_log("Could not create socket\n");
         exit(EXIT_FAILURE);
     }
 	//bind to a specific port first
@@ -156,6 +163,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
     if (client_sock < 0) {
         printf("accept failed\n");
+        write_to_log("Connection accept failed\n");
         exit(EXIT_FAILURE);
     }
 
@@ -279,6 +287,10 @@ int main(int argc , char *argv[]) {
 		n_clnt_program_option = argc - index;
 	}
 
+	if (log_file != NULL) {
+		log_file_fp = fopen(log_file, "w+");
+	}
+
  	// Determine host_file name
 	if (host_file == NULL) {
 		host_file = "hosts";
@@ -323,7 +335,7 @@ int main(int argc , char *argv[]) {
 		
 		if (fork() == 0) {
 	        childProcessMain(i, n_processes, host_name, executable_file, 
-	        	clnt_program_options, n_clnt_program_option, shared);
+	        	clnt_program_options, n_clnt_program_option);
 			*(pids + i) = getpid();
 			exit(0);
 	    }
