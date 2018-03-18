@@ -169,7 +169,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
         exit(EXIT_FAILURE);
     }
 
-	int sval;//test
     char client_message[DATA_SIZE];
 
     while(1) {
