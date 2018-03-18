@@ -130,7 +130,11 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	    argv_remote[i] = (char*)malloc(OPTION_LENTH * sizeof(char));
 	}
 	sprintf(argv_remote[0], "%s","ssh");
-	sprintf(argv_remote[1], "%s", host_name);
+	if (strcmp(host_name, LOCALHOST) == 0) {
+		strcpy(argv_remote[1], local_hostname);
+	} else {
+		sprintf(argv_remote[1], "%s", host_name);
+	}
 	sprintf(argv_remote[2], "%s", executable_file);
 	memcpy(argv_remote[3], ip, strlen(ip) + 1);
 	sprintf(argv_remote[4], "%d", port);
@@ -145,20 +149,20 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	argv_remote[n_clnt_program_option + n_EXTRA_ARG] = NULL; // last element of argv should be NULL
 
 	/* ssh to remote node OR create a new process*/
-	if (strcmp(host_name, LOCALHOST) == 0) {
-		if (fork() == 0) {
-			execvp(argv_remote[2], &argv_remote[2]);
-			write_to_log("dsm.c 149, should not reach here after execvp, something wrong with local remote process execution\n");
-			exit(EXIT_FAILURE);
-		}
-	} else {
+	// if (strcmp(host_name, LOCALHOST) == 0) {
+	// 	if (fork() == 0) {
+	// 		execvp(argv_remote[2], &argv_remote[2]);
+	// 		write_to_log("dsm.c 149, should not reach here after execvp, something wrong with local remote process execution\n");
+	// 		exit(EXIT_FAILURE);
+	// 	}
+	// } else {
 		// execute the command in a separate process
 		if (fork() == 0) {
 			execvp(argv_remote[0], argv_remote);
 			write_to_log("dsm.c 156, should not reach here, something wrong with remote process execution\n");
 			exit(EXIT_FAILURE);
 		}
-	}
+	// }
 	
 	/* wait and build the TCP connection */
 	int c = sizeof(struct sockaddr_in); 
@@ -315,6 +319,7 @@ int main(int argc , char *argv[]) {
 	}
 	size_t len = 0;
 	int r = 0;
+	
 	for(i=0; i < n_processes; i++) {
 		char * host_name = (char *)malloc(HOST_NAME_LENTH * sizeof(char));
 		if (fp != NULL) {
