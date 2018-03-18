@@ -55,12 +55,9 @@ Semaphore *make_semaphore (int n)
 	return sem;
 }
 
-
-
 int sem_signal(Semaphore *sem){
 	return sem_post(sem);
 }
-
 
 
 void printHelpMsg() {
@@ -71,7 +68,6 @@ void cleanUp(int n_processes) {
 	munmap(shared, sizeof(struct Shared));
 	munmap(pids, sizeof(int)*n_processes);
 }
-
 
 
 void childProcessMain(int node_n, int n_processes, char * host_name, 
@@ -204,13 +200,11 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			send(client_sock,client_message, strlen(client_message),0);
 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %d\n",
 			node_n, client_message, strlen(client_message));
-
 		}else if(strcmp(client_message, "sm_malloc")==0){
 			continue;
 		}else if(strcmp(client_message, "sm_bcast")==0){
 			continue;
 		}
-
 	}/* end while */
 
 	close(client_sock);
@@ -218,7 +212,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     debug_printf("child-process %d exit\n", node_n);
     while(wait(NULL)>0) {}
 }
-
 
 
 /*
@@ -293,10 +286,7 @@ int main(int argc , char *argv[]) {
 		host_file = LOCALHOST;
 	}
 
-
 	/************************* fork child processes *******************/
-	
-
 	shared = (struct Shared *)mmap(NULL, sizeof(struct Shared), 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	(*shared).counter = 0;
@@ -331,7 +321,6 @@ int main(int argc , char *argv[]) {
 		}
 		
 		if (fork() == 0) {
-
 	        childProcessMain(i, n_processes, host_name, executable_file, 
 	        	clnt_program_options, n_clnt_program_option, shared);
 			*(pids + i) = getpid();
@@ -342,14 +331,11 @@ int main(int argc , char *argv[]) {
 		fclose(fp);	
 	}
 
-
 	/******************* allocator start working *********************/ 
 	// wait until all the child-process exit, this line must be changed later.
 	while (wait(NULL) > 0) {
 		debug_printf("waiting child processes\n");
 	}
-	
-
 
 	/******************* clean up resources and exit *******************/
 	cleanUp(n_processes);
