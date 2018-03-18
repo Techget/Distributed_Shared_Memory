@@ -93,7 +93,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	struct hostent *he;
 	struct in_addr **addr_list;		
 	if ((he = gethostbyname(local_hostname)) == NULL) {
-		printf("no ip address obtained\n");
+		// printf("no ip address obtained\n");
 		write_to_log("no ip address obtained\n");
 		exit(EXIT_FAILURE);
 	}
@@ -104,7 +104,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
     socket_desc = socket(AF_INET , SOCK_STREAM , 0);
     if (socket_desc == -1) {
-        printf("Could not create socket\n");
+        // printf("Could not create socket\n");
         write_to_log("Could not create socket\n");
         exit(EXIT_FAILURE);
     }
@@ -146,14 +146,14 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	if (strcmp(host_name, LOCALHOST) == 0) {
 		if (fork() == 0) {
 			execvp(argv_remote[2], &argv_remote[2]);
-			printf("should not reach here, something wrong with local remote process execution\n");
+			write_to_log("dsm.c 149, should not reach here after execvp, something wrong with local remote process execution\n");
 			exit(EXIT_FAILURE);
 		}
 	} else {
 		// execute the command in a separate process
 		if (fork() == 0) {
 			execvp(argv_remote[0], argv_remote);
-			printf("should not reach here, something wrong with local remote process execution\n");
+			write_to_log("dsm.c 156, should not reach here, something wrong with remote process execution\n");
 			exit(EXIT_FAILURE);
 		}
 	}
