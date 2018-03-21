@@ -1,0 +1,35 @@
+in addition to m1,
+when the allocator starts up, it reserves(malloc) for 0xffff pages of memory locally as the shared memory region.
+it maintains a page table for the virtual address -> physical(local) address mapping, which is easier if continuous,
+and a table of the node processes' rights to each of these pages.
+the virtual address of the shared memory region should be weird enough for the clients to encounter page faults,
+when trying to access them.
+
+when client processes start up, they call sm_node_init() to contact the allocator, to get the address range of shared memory.
+whenever a client wants a region of shared memory, it calls sm_malloc() to get a page from the allocator.
+based on my understanding of share.c, i think sm_malloc grants the requesting node write permission to the acquired page;
+on the other hand, sm_bcast grants all other nodes read permission to the page;
+but if other nodes want to write to an address received through sm_bcast, they can get write permission to it by double page faulting.
+
+when a client calls sm_malloc, we need to use a message of some format to tell the allocator "i need this size of shared memory"
+in the allocator, we need to change the page tables such that this client has write access to some pages,
+and send the client an address with regard to those pages.
+
+when a client uses an address received through sm_bcast, it is granted read permission in the allocator's page tables,
+and would receive a read copy of that page from the allocator. locally, it would mmap a page for that address, and mprotect it to be read only.
+
+notice the second line of the log, #1: read fault @0, is caused by node 1 executing
+47  sm_bcast ((void **) &sharedChar, 0);
+i'm not sure but i suspect node 1 needs to block and wait for a sm_bcast from other nodes?
+
+when a client with no permission wants to write to a page, it will trigger a read fault first, and wait for a sm_bcast from other nodes.
+then after receiving that address, it will trigger another fault which now should be handled by,
+sending a "i need write access to this page", to the allocator.
+the allocator then needs to invalidate all references to the desired page, and then grant the requesting node write permission.
+
+and i suspect, in sm_barrier, all nodes are granted read permission again, to the invalidated pages,
+since a barrier ensures all execution has completed, and thus reading from the address is safe.
+
+another thing is, in sm_malloc, we need to maintain a watermark,
+so that if the next sm_malloc call requires less than the remaining memory in the previously requested page,
+we don't need to ask for memory from the allocator again.
