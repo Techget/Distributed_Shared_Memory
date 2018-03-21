@@ -58,10 +58,11 @@ void sm_barrier(void) {
         printf("Run sm_node_init first\n");
         return;
     }
+	static int session = 0;
 
 	char message[DATA_SIZE], server_reply[DATA_SIZE];
 	memset(message, 0, DATA_SIZE);
-	sprintf(message, "sm_barrier");
+	sprintf(message, "sm_barrier%d", session++);
 	send(sock, message, strlen(message) , 0);
 	//printf("client send message: %s\n", message);
 	memset(server_reply, 0, DATA_SIZE);
