@@ -79,7 +79,8 @@ void sm_barrier(void) {
 
 /* Allocate object of `size' byte in SM.
  *
- * - Returns NULL if allocation failed.
+ * - size of the shared memory region should be 0xffff pages of memory, upper limit of 256MB
+ * - request space for objects that are larger than the size of an individual memory page
  */
 void *sm_malloc (size_t size){
     if (sock == -1) {
