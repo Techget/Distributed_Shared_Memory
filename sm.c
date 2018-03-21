@@ -51,8 +51,10 @@ void sm_node_exit(void) {
 }
 
 
-/*
-*/
+/* Barrier synchronisation
+ *
+ * - Barriers are not guaranteed to work after some node processes have quit.
+ */
 void sm_barrier(void) {
     if (sock == -1) {
         printf("Run sm_node_init first\n");
@@ -74,3 +76,39 @@ void sm_barrier(void) {
 	//printf("client receive message: %s\n", server_reply);
 }
 
+
+/* Allocate object of `size' byte in SM.
+ *
+ * - Returns NULL if allocation failed.
+ */
+void *sm_malloc (size_t size){
+    if (sock == -1) {
+        printf("Run sm_node_init first\n");
+        return;
+    }
+
+	char message[DATA_SIZE], server_reply[DATA_SIZE];
+	memset(message, 0, DATA_SIZE);
+	sprintf(message, "sm_malloc");
+	send(sock, message, strlen(message) , 0);
+}
+
+
+/* Broadcast an address
+ *
+ * - The address at `*addr' located in node process `root_nid' is transferred
+ *   to the memory area referenced by `addr' on the remaining node processes.
+ * - `addr' may not refer to shared memory.
+ */
+void sm_bcast (void **addr, int root_nid){
+    if (sock == -1) {
+        printf("Run sm_node_init first\n");
+        return;
+    }
+
+	char message[DATA_SIZE], server_reply[DATA_SIZE];
+	memset(message, 0, DATA_SIZE);
+	sprintf(message, "sm_bcast");
+	send(sock, message, strlen(message) , 0);
+
+}

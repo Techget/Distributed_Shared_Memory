@@ -65,7 +65,7 @@ void cleanUp(int n_processes) {
 
 	munmap(shared, sizeof(struct Shared));
 	munmap(pids, sizeof(int)*n_processes);
-
+	munmap(&unblockID, sizeof(int));
 }
 
 
