@@ -8,6 +8,7 @@
 typedef sem_t Semaphore;
 
 typedef struct Shared{
+	int recv_flag;
 	int counter1;
 	int counter2;
 	int n;
