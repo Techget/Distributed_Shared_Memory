@@ -8,13 +8,7 @@
 typedef sem_t Semaphore;
 
 typedef struct Shared{
-<<<<<<< HEAD
-	int recv_flag;
-	int counter1;
-	int counter2;
-=======
 	int counter;
->>>>>>> parent of 0e84d66... update lock
 	int n;
 	Semaphore *mutex;
 }Shared;
