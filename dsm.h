@@ -5,7 +5,6 @@
 *	Data structure to record remote node in allocator
 */
 
-typedef sem_t Semaphore;
 
 typedef struct Shared{
 	int recv_flag;
