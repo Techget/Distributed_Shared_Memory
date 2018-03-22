@@ -73,3 +73,13 @@ void sm_barrier(void) {
 	//printf("client receive message: %s\n", server_reply);
 }
 
+void *sm_malloc (size_t size){
+
+
+}
+
+
+void sm_bcast (void **addr, int root_nid){
+
+    
+}
