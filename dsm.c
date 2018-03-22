@@ -20,7 +20,7 @@
 
 #include "dsm.h"
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 # define debug_printf(...) printf( __VA_ARGS__ );
 #else
@@ -188,7 +188,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
 			sem_wait(shared->mutex);
 			shared->counter++;
-		
+			
 			if(shared->counter == shared->n){
 				shared->counter = 0;
 				for(i=0; i<n_processes; ++i){
