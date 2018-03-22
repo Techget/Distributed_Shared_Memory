@@ -68,7 +68,7 @@ void cleanUp(int n_processes) {
 }
 
 
-void childProcessMain(int node_n, int n_processes, char * host_name, 
+void child_process_main(int node_n, int n_processes, char * host_name, 
 	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {	
 	// Side Note, after fork, the pointer also point to the same virtual addr, tested.
 	// remote program args format ./executable [ip] [port] [n_processes] [nid] [option1] [option2]...
@@ -85,7 +85,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	struct hostent *he;
 	struct in_addr **addr_list;	
 
-	printf("%s\n", local_hostname);
 	if ((he = gethostbyname(local_hostname)) == NULL) {
 		printf("no ip address obtained\n");
 		write_to_log("no ip address obtained\n");
@@ -99,154 +98,154 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
 	printf("IP: %s\n", ip);
 
- //    socket_desc = socket(AF_INET , SOCK_STREAM , 0);
- //    if (socket_desc == -1) {
- //        // printf("Could not create socket\n");
- //        write_to_log("Could not create socket\n");
- //        exit(EXIT_FAILURE);
- //    }
-	// //bind to a specific port first
- //    server.sin_family = AF_INET;
- //    server.sin_addr.s_addr = INADDR_ANY;
- //    server.sin_port = htons(port);
- //    while(bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0 
- //    	&& port < 65535) {
-	// 	port++;
-	// 	server.sin_port = htons(port);	
- //    }
- //    listen(socket_desc , 3);
+    socket_desc = socket(AF_INET , SOCK_STREAM , 0);
+    if (socket_desc == -1) {
+        // printf("Could not create socket\n");
+        write_to_log("Could not create socket\n");
+        exit(EXIT_FAILURE);
+    }
+	//bind to a specific port first
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = INADDR_ANY;
+    server.sin_port = htons(port);
+    while(bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0 
+    	&& port < 65535) {
+		port++;
+		server.sin_port = htons(port);	
+    }
+    listen(socket_desc , 3);
 
- //    /* prepare the args to execute program on remote node/local machine*/
- //    // extra args are: [./func name] [ip] [port] [n_processes] [nid] [options(doesnot counter)] [NULL]
- //    // the last parameter must be NULL, that's the standard for argv
-	// int n_EXTRA_ARG = 8; 
-	// char **argv_remote = (char**)malloc((n_clnt_program_option + n_EXTRA_ARG) * sizeof(char*));
-	// for ( i = 0; i < (n_clnt_program_option + n_EXTRA_ARG); i++ ) {
-	//     argv_remote[i] = (char*)malloc(OPTION_LENTH * sizeof(char));
-	// }
-	// sprintf(argv_remote[0], "%s","ssh");
-	// sprintf(argv_remote[1], "%s", host_name);
-	// sprintf(argv_remote[2], "%s", executable_file);
-	// memcpy(argv_remote[3], ip, strlen(ip) + 1);
-	// sprintf(argv_remote[4], "%d", port);
-	// sprintf(argv_remote[5], "%d", n_processes);
-	// sprintf(argv_remote[6], "%d", node_n);
+    /* prepare the args to execute program on remote node/local machine*/
+    // extra args are: [./func name] [ip] [port] [n_processes] [nid] [options(doesnot counter)] [NULL]
+    // the last parameter must be NULL, that's the standard for argv
+	int n_EXTRA_ARG = 8; 
+	char **argv_remote = (char**)malloc((n_clnt_program_option + n_EXTRA_ARG) * sizeof(char*));
+	for ( i = 0; i < (n_clnt_program_option + n_EXTRA_ARG); i++ ) {
+	    argv_remote[i] = (char*)malloc(OPTION_LENTH * sizeof(char));
+	}
+	sprintf(argv_remote[0], "%s","ssh");
+	sprintf(argv_remote[1], "%s", host_name);
+	sprintf(argv_remote[2], "%s", executable_file);
+	memcpy(argv_remote[3], ip, strlen(ip) + 1);
+	sprintf(argv_remote[4], "%d", port);
+	sprintf(argv_remote[5], "%d", n_processes);
+	sprintf(argv_remote[6], "%d", node_n);
 
 
-	// for(i=0; i<n_clnt_program_option; i++) {
-	// 	memcpy(argv_remote[i+n_EXTRA_ARG-1], 
-	// 		*(clnt_program_options + i), 
-	// 		strlen(*(clnt_program_options + i)) + 1); // +1 will include '\0'
-	// }
-	// argv_remote[n_clnt_program_option + n_EXTRA_ARG] = NULL; // last element of argv should be NULL
+	for(i=0; i<n_clnt_program_option; i++) {
+		memcpy(argv_remote[i+n_EXTRA_ARG-1], 
+			*(clnt_program_options + i), 
+			strlen(*(clnt_program_options + i)) + 1); // +1 will include '\0'
+	}
+	argv_remote[n_clnt_program_option + n_EXTRA_ARG] = NULL; // last element of argv should be NULL
 
-	// /* ssh to remote node OR create a new process*/
-	// if (strcmp(host_name, LOCALHOST) == 0) {
-	// 	if (fork() == 0) {
-	// 		execvp(argv_remote[2], &argv_remote[2]);
-	// 		write_to_log("dsm.c 149, should not reach here after execvp, something wrong with local remote process execution\n");
-	// 		exit(EXIT_FAILURE);
-	// 	}
-	// } else {
-	// 	// execute the command in a separate process
-	// 	if (fork() == 0) {
-	// 		execvp(argv_remote[0], argv_remote);
-	// 		write_to_log("dsm.c 156, should not reach here, something wrong with remote process execution\n");
-	// 		exit(EXIT_FAILURE);
-	// 	}
-	// }
+	/* ssh to remote node OR create a new process*/
+	if (strcmp(host_name, LOCALHOST) == 0) {
+		if (fork() == 0) {
+			execvp(argv_remote[2], &argv_remote[2]);
+			write_to_log("dsm.c 149, should not reach here after execvp, something wrong with local remote process execution\n");
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		// execute the command in a separate process
+		if (fork() == 0) {
+			execvp(argv_remote[0], argv_remote);
+			write_to_log("dsm.c 156, should not reach here, something wrong with remote process execution\n");
+			exit(EXIT_FAILURE);
+		}
+	}
 	
-	// /* wait and build the TCP connection */
-	// int c = sizeof(struct sockaddr_in); 
- //    client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
- //    if (client_sock < 0) {
- //        printf("accept failed\n");
- //        write_to_log("Connection accept failed\n");
- //        exit(EXIT_FAILURE);
- //    }
+	/* wait and build the TCP connection */
+	int c = sizeof(struct sockaddr_in); 
+    client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
+    if (client_sock < 0) {
+        printf("accept failed\n");
+        write_to_log("Connection accept failed\n");
+        exit(EXIT_FAILURE);
+    }
 
- //    char client_message[DATA_SIZE];
-	// char barrier_message[DATA_SIZE];
+    char client_message[DATA_SIZE];
+	char barrier_message[DATA_SIZE];
 	
- //    while(1) {
-	// 	if(!shared->recv_flag) continue; // not receving when shared->recv_flag==0
+    while(1) {
+		if(!shared->recv_flag) continue; // not receving when shared->recv_flag==0
 
-	// 	memset(client_message, 0,DATA_SIZE );
-	// 	int num = recv(client_sock, client_message, DATA_SIZE, 0);
-	// 	if (num == -1) {
-	// 	        perror("recv");
-	// 	        exit(1);
-	// 	}
-	// 	else if (num == 0) {
-	// 	        debug_printf("child-process %d Connection closed\n", node_n);
-	// 	        break;
-	// 	}
-	// 	debug_printf("child-process %d, msg Received %s\n", node_n, client_message);
+		memset(client_message, 0,DATA_SIZE );
+		int num = recv(client_sock, client_message, DATA_SIZE, 0);
+		if (num == -1) {
+		        perror("recv");
+		        exit(1);
+		}
+		else if (num == 0) {
+		        debug_printf("child-process %d Connection closed\n", node_n);
+		        break;
+		}
+		debug_printf("child-process %d, msg Received %s\n", node_n, client_message);
 
-	// 	pthread_mutex_lock(&mutex2);// lock
-	// 	debug_printf("child-process %d, session: %d\n", node_n, shared->session);
-	// 	memset(barrier_message, 0, DATA_SIZE);
-	// 	sprintf(barrier_message, "sm_barrier%d", shared->session);
+		pthread_mutex_lock(&mutex2);// lock
+		debug_printf("child-process %d, session: %d\n", node_n, shared->session);
+		memset(barrier_message, 0, DATA_SIZE);
+		sprintf(barrier_message, "sm_barrier%d", shared->session);
 
-	// 	pthread_mutex_unlock(&mutex2);// unlock
+		pthread_mutex_unlock(&mutex2);// unlock
 
-	// 	if(strcmp(client_message, barrier_message)==0){
-	// 		debug_printf("child-process %d, start process sm_barrier\n", node_n);
+		if(strcmp(client_message, barrier_message)==0){
+			debug_printf("child-process %d, start process sm_barrier\n", node_n);
 
-	// 		pthread_mutex_lock(&mutex1); // lock
-	// 		shared->counter1++;
-	// 		debug_printf("child-process %d, counter1: %d\n",node_n, shared->counter1);
-	// 		if(shared->counter1 == shared->n){
-	// 			shared->counter1 = 0;
-	// 			unblockID = node_n;
-	// 			shared->recv_flag = 0; // disallow receving
-	// 			debug_printf("child-process %d, empty counter1\n",node_n);
-	// 			for(i=0; i<n_processes; ++i){
-	// 				// send signal to all child to continue from SIGSTOP
-	// 				if(i==node_n)	continue;
-	// 				usleep(20);
-	// 				kill(*(pids + i), SIGCONT); 
-	// 			}
-	// 		}
+			pthread_mutex_lock(&mutex1); // lock
+			shared->counter1++;
+			debug_printf("child-process %d, counter1: %d\n",node_n, shared->counter1);
+			if(shared->counter1 == shared->n){
+				shared->counter1 = 0;
+				unblockID = node_n;
+				shared->recv_flag = 0; // disallow receving
+				debug_printf("child-process %d, empty counter1\n",node_n);
+				for(i=0; i<n_processes; ++i){
+					// send signal to all child to continue from SIGSTOP
+					if(i==node_n)	continue;
+					usleep(20);
+					kill(*(pids + i), SIGCONT); 
+				}
+			}
 
 
-	// 		debug_printf("child-process %d, wait, unblockID: %d\n",node_n, unblockID);
-	// 		if(node_n!=unblockID){
-	// 			// stop process and wait, do not block itself when counter==0
-	// 			raise(SIGSTOP);
-	// 			pthread_mutex_unlock(&mutex1); // unlock
-	// 		}else{
-	// 			unblockID = -1;
-	// 			pthread_mutex_unlock(&mutex1); // unlock
-	// 		}
-	// 		debug_printf("child-process %d, after wait\n",node_n);
+			debug_printf("child-process %d, wait, unblockID: %d\n",node_n, unblockID);
+			if(node_n!=unblockID){
+				// stop process and wait, do not block itself when counter==0
+				raise(SIGSTOP);
+				pthread_mutex_unlock(&mutex1); // unlock
+			}else{
+				unblockID = -1;
+				pthread_mutex_unlock(&mutex1); // unlock
+			}
+			debug_printf("child-process %d, after wait\n",node_n);
 
-	// 		pthread_mutex_lock(&mutex2);// lock
-	// 		shared->counter2++;
-	// 		debug_printf("child-process %d, counter2: %d\n",node_n, shared->counter2);
+			pthread_mutex_lock(&mutex2);// lock
+			shared->counter2++;
+			debug_printf("child-process %d, counter2: %d\n",node_n, shared->counter2);
 
-	// 		send(client_sock,client_message, strlen(client_message),0);
-	// 		debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
-	// 		node_n, client_message, strlen(client_message));
-	// 		if(shared->counter2 == shared->n){
-	// 			shared->counter2 = 0;
-	// 			shared->session++;
-	// 			shared->recv_flag = 1; // allow receving
-	// 		}
-	// 		debug_printf("child-process %d, session: %d\n", node_n, shared->session);
-	// 		pthread_mutex_unlock(&mutex2);// unlock
+			send(client_sock,client_message, strlen(client_message),0);
+			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
+			node_n, client_message, strlen(client_message));
+			if(shared->counter2 == shared->n){
+				shared->counter2 = 0;
+				shared->session++;
+				shared->recv_flag = 1; // allow receving
+			}
+			debug_printf("child-process %d, session: %d\n", node_n, shared->session);
+			pthread_mutex_unlock(&mutex2);// unlock
 
-	// 	}else if(strcmp(client_message, "sm_malloc")==0){
-	// 		continue;
-	// 	}else if(strcmp(client_message, "sm_bcast")==0){
-	// 		continue;
-	// 	}
-	// }/* end while */
+		}else if(strcmp(client_message, "sm_malloc")==0){
+			continue;
+		}else if(strcmp(client_message, "sm_bcast")==0){
+			continue;
+		}
+	}/* end while */
 
-	// close(client_sock);
+	close(client_sock);
 
- //    debug_printf("child-process %d exit\n", node_n);
- //    while(wait(NULL)>0) {}
+    debug_printf("child-process %d exit\n", node_n);
+    while(wait(NULL)>0) {}
 }
 
 
@@ -377,7 +376,7 @@ int main(int argc , char *argv[]) {
 		}
 		
 		if (fork() == 0) {
-	        childProcessMain(i, n_processes, host_name, executable_file, 
+	        child_process_main(i, n_processes, host_name, executable_file, 
 	        	clnt_program_options, n_clnt_program_option);
 			*(pids + i) = getpid();
 			exit(0);
