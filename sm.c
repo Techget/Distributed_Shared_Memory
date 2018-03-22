@@ -89,8 +89,14 @@ void *sm_malloc (size_t size){
 
 	char message[DATA_SIZE], server_reply[DATA_SIZE];
 	memset(message, 0, DATA_SIZE);
-	sprintf(message, "sm_malloc");
+	sprintf(message, "sm_malloc=%d", size);
 	send(sock, message, strlen(message) , 0);
+
+	memset(server_reply, 0, DATA_SIZE);
+	int temp = recv(sock, server_reply, DATA_SIZE, 0);
+
+	//return server_reply;
+
 }
 
 
@@ -99,6 +105,7 @@ void *sm_malloc (size_t size){
  * - The address at `*addr' located in node process `root_nid' is transferred
  *   to the memory area referenced by `addr' on the remaining node processes.
  * - `addr' may not refer to shared memory.
+ * - act as barrier
  */
 void sm_bcast (void **addr, int root_nid){
     if (sock == -1) {

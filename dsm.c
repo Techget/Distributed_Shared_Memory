@@ -19,7 +19,7 @@
 #include <semaphore.h>
 
 #include "dsm.h"
-
+#include "memory.h"
 
 #define DEBUG
 #ifdef DEBUG
