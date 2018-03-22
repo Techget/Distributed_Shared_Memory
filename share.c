@@ -37,7 +37,7 @@ int main (int argc, char *argv[])
   if (sm_node_init (&argc, &argv, &nodes, &nid))
     fatal (nid, "share: Cannot initialise!");
 
-  /* first, node #0 allocates a shared variable and uses it to communicate
+  /* first, node #0 allocates a shared variable and         uses it to communicate
    * the letter `A' to node #1
    */
   if (0 == nid) {

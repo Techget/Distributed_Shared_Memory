@@ -84,12 +84,16 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
  	char local_hostname[HOST_NAME_LENTH];
     gethostname(local_hostname, HOST_NAME_LENTH);
 	struct hostent *he;
-	struct in_addr **addr_list;		
+	struct in_addr **addr_list;	
+
+
 	if ((he = gethostbyname(local_hostname)) == NULL) {
 		// printf("no ip address obtained\n");
 		write_to_log("no ip address obtained\n");
 		exit(EXIT_FAILURE);
 	}
+
+	debug_printf("fork child\n");	
 	addr_list = (struct in_addr **) he->h_addr_list;
 	for(i = 0; addr_list[i] != NULL; i++) {
 		strcpy(ip , inet_ntoa(*addr_list[i]));
@@ -127,6 +131,9 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	sprintf(argv_remote[4], "%d", port);
 	sprintf(argv_remote[5], "%d", n_processes);
 	sprintf(argv_remote[6], "%d", node_n);
+
+
+
 
 	for(i=0; i<n_clnt_program_option; i++) {
 		memcpy(argv_remote[i+n_EXTRA_ARG-1], 
@@ -320,6 +327,9 @@ int main(int argc , char *argv[]) {
 	if (access(host_file, F_OK) == -1) {
 		host_file = LOCALHOST;
 	}
+
+
+
 
 	/************************* fork child processes *******************/
 	shared = (struct Shared *)mmap(NULL, sizeof(struct Shared), 
