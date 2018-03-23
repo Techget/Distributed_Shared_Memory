@@ -14,6 +14,7 @@ typedef struct Shared{
 	int n;
 	int session;
 	int unblockID;
+	int* pids;
 }Shared;
 
 

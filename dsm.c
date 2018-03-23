@@ -33,7 +33,7 @@ static struct Shared* shared;
 static struct Shared_Mem* shared_mem;
 
 
-static int* pids;
+
 static pthread_mutex_t mutex1;
 static pthread_mutexattr_t attrmutex1;
 static pthread_mutex_t mutex2;
@@ -50,6 +50,8 @@ void child_send_message(int node_n, int sock, char *message, char *format, ...){
 	debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
 			node_n, message, strlen(message));
 }
+
+
 
 
 
@@ -71,7 +73,7 @@ void cleanUp(int n_processes) {
 
 	munmap(shared, sizeof(struct Shared));
 	munmap(shared_mem, sizeof(struct Shared_Mem));
-	munmap(pids, sizeof(int)*n_processes);
+
 
 }
 
@@ -103,8 +105,6 @@ void child_process_main(int node_n, int n_processes, char * host_name,
 	for(i = 0; addr_list[i] != NULL; i++) {
 		strcpy(ip , inet_ntoa(*addr_list[i]));
 	}
-
-
 
     socket_desc = socket(AF_INET , SOCK_STREAM , 0);
     if (socket_desc == -1) {
@@ -211,8 +211,9 @@ void child_process_main(int node_n, int n_processes, char * host_name,
 				for(i=0; i<n_processes; ++i){
 					// send signal to all child to continue from SIGSTOP
 					if(i==node_n)	continue;
-					usleep(200);
-					kill(*(pids + i), SIGCONT); 
+					usleep(2000);
+					debug_printf("child-process %d, send signal %d\n", node_n, *(shared->pids + i))
+					kill(*(shared->pids + i), SIGCONT); 
 				}
 			}
 
@@ -358,8 +359,6 @@ int main(int argc , char *argv[]) {
 	(*shared_mem).pointer = NULL;
 
 
-	pids = (int *)mmap(NULL, sizeof(int)* n_processes, 
-	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	
 	pthread_mutexattr_init(&attrmutex1);
 	pthread_mutexattr_setpshared(&attrmutex1, PTHREAD_PROCESS_SHARED);
@@ -404,9 +403,10 @@ int main(int argc , char *argv[]) {
 		}
 		
 		if (fork() == 0) {
+			*(shared->pids + i) = getpid();
 	        child_process_main(i, n_processes, host_name, executable_file, 
 	        	clnt_program_options, n_clnt_program_option);
-			*(pids + i) = getpid();
+
 			exit(0);
 	    }
 	}

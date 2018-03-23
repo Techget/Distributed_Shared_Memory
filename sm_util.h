@@ -4,6 +4,9 @@
 
 #include <stdio.h>
 
+/**
+*	Common functions used in dsm and sm are defined in sm_util.h
+*/
 
 
 #define DEBUG
@@ -12,6 +15,7 @@
 #else
 # define debug_printf(...) do {} while(0)
 #endif
+
 
 
 long get_number(char *str);
