@@ -18,7 +18,7 @@
 #include <pthread.h>
 
 #include "dsm.h"
-#include "memory.h"
+#include "sm_mem.h"
 
 #define DEBUG
 #ifdef DEBUG
@@ -44,7 +44,6 @@ static pthread_mutexattr_t attrmutex2;
 
 
 static FILE * log_file_fp;
-
 
 
 void write_to_log(const char * s) {
@@ -385,6 +384,10 @@ int main(int argc , char *argv[]) {
 	if (fp != NULL) {
 		fclose(fp);	
 	}
+	/******************* create shared memory *********************/ 
+
+	create_mmap(0);
+
 
 	/******************* allocator start working *********************/ 
 	// wait until all the child-process exit, this line must be changed later.

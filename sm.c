@@ -6,7 +6,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
+
 #include "sm.h"
+#include "sm_mem.h"
 
 #define DATA_SIZE 1024
 
@@ -29,7 +31,7 @@ void handler (int signum, siginfo_t *si, void *ctx)
 
     char message[DATA_SIZE];
     memset(message, 0, DATA_SIZE);
-    sprintf(message, "Caught a SEGV...and the offending address is %p.\n", addr);
+    sprintf(message, "SEGV=%p", addr);
     send(sock, message, strlen(message) , 0);
 
 
@@ -79,6 +81,8 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
 
     signaction_init();
 
+
+    create_mmap(*nid);
 
     return 0;
 }
