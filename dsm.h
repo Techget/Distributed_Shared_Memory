@@ -4,9 +4,6 @@
 /**
 *	Data structure to record remote node in allocator
 */
-
-
-
 typedef struct Shared{
 	int recv_flag;
 	int counter1;

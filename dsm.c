@@ -32,8 +32,6 @@
 static struct Shared* shared;
 static struct Shared_Mem* shared_mem;
 
-
-
 static pthread_mutex_t mutex1;
 static pthread_mutexattr_t attrmutex1;
 static pthread_mutex_t mutex2;
@@ -43,13 +41,7 @@ static pthread_mutexattr_t attrmutex2;
 static FILE * log_file_fp;
 
 
-void child_send_message(int node_n, int sock, char *message, char *format, ...){
-	memset(message, 0, DATA_SIZE);
-	sprintf(message, format);
-	send(sock,message, strlen(message),0);
-	debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
-			node_n, message, strlen(message));
-}
+
 
 
 

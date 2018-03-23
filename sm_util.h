@@ -3,10 +3,13 @@
 
 
 #include <stdio.h>
-
+#include <stdlib.h>
+#include <string.h>
 /**
 *	Common functions used in dsm and sm are defined in sm_util.h
 */
+#define DATA_SIZE 1024
+
 
 
 #define DEBUG
@@ -19,7 +22,7 @@
 
 
 long get_number(char *str);
-
+void tcp_send_message(int sock, char *format, ...);
 
 
 #endif
