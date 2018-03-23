@@ -5,11 +5,31 @@
 #include <netinet/in.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <signal.h>
 #include "sm.h"
 
 #define DATA_SIZE 1024
 
 static int sock = -1;
+
+
+
+void handler (int signum, siginfo_t *si, void *ctx)
+{
+  void *addr;
+
+  if (SIGSEGV != signum) {
+    printf ("Panic!");
+    exit (1);
+  }
+  printf ("Caught a SEGV...\n");
+  addr = si->si_addr;         /* here we get the fault address */
+  printf ("...and the offending address is %p.\n", addr);
+
+  exit (0);
+}
+
+
 
 int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
 	// Pattern: ./executable [ip] [port] [n_processes] [nid] [option1] [option2]...
@@ -44,6 +64,16 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
     }
     (*argc) -= extra_arguments;
     return 0;
+
+    // init signal
+    struct sigaction sa;
+
+    sa.sa_sigaction = handler;
+    sa.sa_flags     = SA_SIGINFO;
+    sigemptyset (&sa.sa_mask);
+    sigaction (SIGSEGV, &sa, NULL);
+
+
 }
 
 void sm_node_exit(void) {
@@ -83,3 +113,6 @@ void sm_bcast (void **addr, int root_nid){
 
     
 }
+
+
+
