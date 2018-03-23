@@ -36,6 +36,7 @@
 
 static struct Shared* shared;
 static int* pids;
+static struct remote_node * remote_node_table;
 static FILE * log_file_fp;
 
 /*********************** Semaphore *******************************/
@@ -185,10 +186,15 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		
 		if(strcmp(client_message, "sm_barrier")==0){
 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
+			(*(remote_node_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
+
+			// sem_wait(shared->mutex);
 			((*shared).barrier_counter)++;
+			// sem_post(shared->mutex);
+
 			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
 			
-			while((*shared).barrier_counter > 0) {
+			while((*(remote_node_table+node_n)).barrier_blocked) {
 				sleep(0);
 			}
 
@@ -295,9 +301,12 @@ int main(int argc , char *argv[]) {
 	(*shared).barrier_counter = 0;
 	(*shared).online_counter = n_processes;
 	// (*shared).n = n_processes;
-	// (*shared).mutex = make_semaphore(1);
+	(*shared).mutex = make_semaphore(1);
 	
 	pids = (int *)mmap(NULL, sizeof(int)* n_processes, 
+	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+	remote_node_table = (struct remote_node *)mmap(NULL, sizeof(struct remote_node)*n_processes, 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	
 	FILE * fp = NULL;
@@ -327,8 +336,10 @@ int main(int argc , char *argv[]) {
 		if (pid == 0) {
 	        childProcessMain(i, n_processes, host_name, executable_file, 
 	        	clnt_program_options, n_clnt_program_option);
+	        exit(0);
 	    } else {
 	   		*(pids + i) = pid;
+	   		(*(remote_node_table + i)).barrier_blocked = 0;
 	    }
 	}
 	if (fp != NULL) {
@@ -338,10 +349,14 @@ int main(int argc , char *argv[]) {
 	/******************* allocator start working *********************/ 
 	// wait until all the child-process exit, this line must be changed later.
 	while ((*shared).online_counter > 0) {
-		int status;
-		printf("main loop, online_counter: %d\n", (*shared).barrier_counter);
 		if ((*shared).barrier_counter == n_processes) {
+			// sem_wait(shared->mutex);
 			(*shared).barrier_counter = 0;
+			int i;
+			for(i=0; i<n_processes; i++) {
+				(*(remote_node_table + i)).barrier_blocked = 0;
+			}
+			// sem_post(shared->mutex);
 		}
 	}
 

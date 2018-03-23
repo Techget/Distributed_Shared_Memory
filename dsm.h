@@ -11,11 +11,11 @@ typedef struct Shared{
 	int barrier_counter;
 	int online_counter;
 	// int n;
-	// Semaphore *mutex;
+	Semaphore *mutex;
 }Shared;
 
 struct remote_node {
-	int barrier_step; // be aware of overflow
+	int barrier_blocked;
 };
 
 /**
