@@ -187,7 +187,10 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
 			((*shared).barrier_counter)++;
 			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
-			raise(SIGTSTP);
+			
+			while((*shared).barrier_counter > 0) {
+				sleep(0);
+			}
 
 			debug_printf("child-process %d, after wait\n",node_n);
 
@@ -325,7 +328,6 @@ int main(int argc , char *argv[]) {
 	        childProcessMain(i, n_processes, host_name, executable_file, 
 	        	clnt_program_options, n_clnt_program_option);
 	    } else {
-	   		// do nothing
 	   		*(pids + i) = pid;
 	    }
 	}
@@ -333,61 +335,13 @@ int main(int argc , char *argv[]) {
 		fclose(fp);	
 	}
 
-	// for(i=0; i<n_processes; i++) {
-	// 	printf("*(pids+%d): %d\n", i, *(pids+i));
-	// }
-
 	/******************* allocator start working *********************/ 
 	// wait until all the child-process exit, this line must be changed later.
 	while ((*shared).online_counter > 0) {
 		int status;
-		// for(i = 0; i < n_processes; i++) {
-		// 	waitpid(*(pids+i), &status, WUNTRACED | WCONTINUED | WNOHANG);
-		// 	printf("main loop, *(pids+%d): %d, stopped: %d, continued: %d\n", i, *(pids+i), WIFSTOPPED(status), WIFCONTINUED(status));
-		// }
-		// printf("main loop, online_counter: %d\n", (*shared).online_counter);
+		printf("main loop, online_counter: %d\n", (*shared).barrier_counter);
 		if ((*shared).barrier_counter == n_processes) {
-			// int status, i;
-			// int sig_continue_flag = 1;
-			// for(i = 0; i < n_processes; i++) {
-			// 	waitpid(*(pids+i), &status, WUNTRACED | WNOHANG);
-			// 	// printf("*(pids+%d): %d, stopped: %d, continued: %d\n",i,*(pids+i), WIFSTOPPED(status), WIFCONTINUED(status));
-			// 	if (WIFEXITED(status)) {
-			// 		continue;
-			// 	}
-			// 	if (!WIFSTOPPED(status)) {
-			// 		 printf("exited:    %d status: %d\n"
-			//              "signalled: %d signal: %d\n"
-			//              "stopped:   %d signal: %d\n"
-			//              "continued: %d\n",
-			//              WIFEXITED(status),
-			//              WEXITSTATUS(status),
-			//              WIFSIGNALED(status),
-			//              WTERMSIG(status),
-			//              WIFSTOPPED(status),
-			//              WSTOPSIG(status),
-			//              WIFCONTINUED(status));
-			// 		// kill(*(pids+i), SIGTSTP);
-			// 		sig_continue_flag = 0;
-			// 		break;
-			// 	}
-			// }
-			// if (sig_continue_flag) {
-			// 	(*shared).barrier_counter = 0;
-			// 	printf("set barrier_counter to 0: %d\n", (*shared).barrier_counter);
-			// 	for(i=0; i<n_processes; i++){
-			// 		kill(*(pids + i), SIGCONT); 
-			// 		// waitpid(*(pids+i), &status, WUNTRACED | WCONTINUED | WNOHANG);
-			// 		// printf("send SIGCONT, *(pids+i): %d, stopped: %d, continued: %d\n",*(pids+i), WIFSTOPPED(status), WIFCONTINUED(status));
-			// 	}
-			// }	
 			(*shared).barrier_counter = 0;
-			// printf("set barrier_counter to 0: %d\n", (*shared).barrier_counter);
-			for(i=0; i<n_processes; i++){
-				kill(*(pids + i), SIGCONT); 
-				// waitpid(*(pids+i), &status, WUNTRACED | WCONTINUED | WNOHANG);
-				// printf("send SIGCONT, *(pids+i): %d, stopped: %d, continued: %d\n",*(pids+i), WIFSTOPPED(status), WIFCONTINUED(status));
-			}
 		}
 	}
 
