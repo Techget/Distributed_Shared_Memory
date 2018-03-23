@@ -16,9 +16,9 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <semaphore.h>
 
 #include "dsm.h"
+#include "memory.h"
 
 #define DEBUG
 #ifdef DEBUG
@@ -36,27 +36,16 @@
 
 static struct Shared* shared;
 static int* pids;
+static int unblockID;
+static pthread_mutex_t mutex1;
+static pthread_mutexattr_t attrmutex1;
+static pthread_mutex_t mutex2;
+static pthread_mutexattr_t attrmutex2;
+
+
 static FILE * log_file_fp;
 
-/*********************** Semaphore *******************************/
-Semaphore *make_semaphore (int n)
-{
-	Semaphore *sem = malloc (sizeof(Semaphore));
-	if (sem == NULL){
-		perror("malloc failed");
-		exit(-1);
-	}
-	int ret = sem_init(sem, 0, n);
-	if (ret == -1) {
-		perror("sem_init failed");
-		exit(-1);
-	}
-	return sem;
-}
 
-int sem_signal(Semaphore *sem){
-	return sem_post(sem);
-}
 
 void write_to_log(const char * s) {
 	if (log_file_fp != NULL) {
@@ -72,13 +61,14 @@ void cleanUp(int n_processes) {
 	if (log_file_fp != NULL) {
 		fclose(log_file_fp);
 	}
-	sem_destroy(shared->mutex);
+
 	munmap(shared, sizeof(struct Shared));
 	munmap(pids, sizeof(int)*n_processes);
+	munmap(&unblockID, sizeof(int));
 }
 
 
-void childProcessMain(int node_n, int n_processes, char * host_name, 
+void child_process_main(int node_n, int n_processes, char * host_name, 
 	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {	
 	// Side Note, after fork, the pointer also point to the same virtual addr, tested.
 	// remote program args format ./executable [ip] [port] [n_processes] [nid] [option1] [option2]...
@@ -93,16 +83,20 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
  	char local_hostname[HOST_NAME_LENTH];
     gethostname(local_hostname, HOST_NAME_LENTH);
 	struct hostent *he;
-	struct in_addr **addr_list;		
+	struct in_addr **addr_list;	
+
 	if ((he = gethostbyname(local_hostname)) == NULL) {
-		// printf("no ip address obtained\n");
+		printf("no ip address obtained\n");
 		write_to_log("no ip address obtained\n");
 		exit(EXIT_FAILURE);
 	}
+
 	addr_list = (struct in_addr **) he->h_addr_list;
 	for(i = 0; addr_list[i] != NULL; i++) {
 		strcpy(ip , inet_ntoa(*addr_list[i]));
 	}
+
+
 
     socket_desc = socket(AF_INET , SOCK_STREAM , 0);
     if (socket_desc == -1) {
@@ -131,11 +125,12 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	}
 	sprintf(argv_remote[0], "%s","ssh");
 	sprintf(argv_remote[1], "%s", host_name);
-	sprintf(argv_remote[2], "./%s", executable_file);
+	sprintf(argv_remote[2], "%s", executable_file);
 	memcpy(argv_remote[3], ip, strlen(ip) + 1);
 	sprintf(argv_remote[4], "%d", port);
 	sprintf(argv_remote[5], "%d", n_processes);
 	sprintf(argv_remote[6], "%d", node_n);
+
 
 	for(i=0; i<n_clnt_program_option; i++) {
 		memcpy(argv_remote[i+n_EXTRA_ARG-1], 
@@ -170,8 +165,11 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     }
 
     char client_message[DATA_SIZE];
-
+	char barrier_message[DATA_SIZE];
+	
     while(1) {
+		if(!shared->recv_flag) continue; // not receving when shared->recv_flag==0
+
 		memset(client_message, 0,DATA_SIZE );
 		int num = recv(client_sock, client_message, DATA_SIZE, 0);
 		if (num == -1) {
@@ -183,32 +181,60 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		        break;
 		}
 		debug_printf("child-process %d, msg Received %s\n", node_n, client_message);
-		
-		if(strcmp(client_message, "sm_barrier")==0){
+
+		pthread_mutex_lock(&mutex2);// lock
+		debug_printf("child-process %d, session: %d\n", node_n, shared->session);
+		memset(barrier_message, 0, DATA_SIZE);
+		sprintf(barrier_message, "sm_barrier%d", shared->session);
+
+		pthread_mutex_unlock(&mutex2);// unlock
+
+		if(strcmp(client_message, barrier_message)==0){
 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
-			sem_wait(shared->mutex);
-			shared->counter++;
-			
-			if(shared->counter == shared->n){
-				shared->counter = 0;
+
+			pthread_mutex_lock(&mutex1); // lock
+			shared->counter1++;
+			debug_printf("child-process %d, counter1: %d\n",node_n, shared->counter1);
+			if(shared->counter1 == shared->n){
+				shared->counter1 = 0;
+				unblockID = node_n;
+				shared->recv_flag = 0; // disallow receving
+				debug_printf("child-process %d, empty counter1\n",node_n);
 				for(i=0; i<n_processes; ++i){
 					// send signal to all child to continue from SIGSTOP
+					if(i==node_n)	continue;
+					usleep(200);
 					kill(*(pids + i), SIGCONT); 
 				}
 			}
-			sem_signal(shared->mutex);
 
-			debug_printf("child-process %d, wait\n",node_n);
-			if(shared->counter!=0){
+
+			debug_printf("child-process %d, wait, unblockID: %d\n",node_n, unblockID);
+			if(node_n!=unblockID){
 				// stop process and wait, do not block itself when counter==0
 				raise(SIGSTOP);
+				pthread_mutex_unlock(&mutex1); // unlock
+			}else{
+				unblockID = -1;
+				pthread_mutex_unlock(&mutex1); // unlock
 			}
-
 			debug_printf("child-process %d, after wait\n",node_n);
+
+			pthread_mutex_lock(&mutex2);// lock
+			shared->counter2++;
+			debug_printf("child-process %d, counter2: %d\n",node_n, shared->counter2);
 
 			send(client_sock,client_message, strlen(client_message),0);
 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
 			node_n, client_message, strlen(client_message));
+			if(shared->counter2 == shared->n){
+				shared->counter2 = 0;
+				shared->session++;
+				shared->recv_flag = 1; // allow receving
+			}
+			debug_printf("child-process %d, session: %d\n", node_n, shared->session);
+			pthread_mutex_unlock(&mutex2);// unlock
+
 		}else if(strcmp(client_message, "sm_malloc")==0){
 			continue;
 		}else if(strcmp(client_message, "sm_bcast")==0){
@@ -235,7 +261,7 @@ int main(int argc , char *argv[]) {
 	char * log_file = NULL;
 	char * executable_file = NULL;
 	int n_processes = 1;
-	char ** clnt_program_options = NULL;
+	char **clnt_program_options = NULL;
 	int n_clnt_program_option = 0;
 	
 	/**************** read arguments with getOpt ***************/
@@ -299,16 +325,33 @@ int main(int argc , char *argv[]) {
 		host_file = LOCALHOST;
 	}
 
+
+
+
 	/************************* fork child processes *******************/
 	shared = (struct Shared *)mmap(NULL, sizeof(struct Shared), 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	(*shared).counter = 0;
+	(*shared).recv_flag = 1;
+	(*shared).counter1 = 0;
+	(*shared).counter2 = 0;
 	(*shared).n = n_processes;
-	(*shared).mutex = make_semaphore(1);
+	(*shared).session = 0;
 
 	pids = (int *)mmap(NULL, sizeof(int)* n_processes, 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	
+	unblockID = (int)mmap(NULL, sizeof(int), 
+	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	unblockID = -1;
+
+	pthread_mutexattr_init(&attrmutex1);
+	pthread_mutexattr_setpshared(&attrmutex1, PTHREAD_PROCESS_SHARED);
+	pthread_mutex_init(&mutex1, &attrmutex1);
+
+	pthread_mutexattr_init(&attrmutex2);
+	pthread_mutexattr_setpshared(&attrmutex2, PTHREAD_PROCESS_SHARED);
+	pthread_mutex_init(&mutex2, &attrmutex2);
+
 	FILE * fp = NULL;
 	if (strcmp(host_file, LOCALHOST) != 0) {
 		fp = fopen(host_file, "r");
@@ -333,7 +376,7 @@ int main(int argc , char *argv[]) {
 		}
 		
 		if (fork() == 0) {
-	        childProcessMain(i, n_processes, host_name, executable_file, 
+	        child_process_main(i, n_processes, host_name, executable_file, 
 	        	clnt_program_options, n_clnt_program_option);
 			*(pids + i) = getpid();
 			exit(0);
@@ -354,10 +397,4 @@ int main(int argc , char *argv[]) {
 	debug_printf("Exiting allocator\n");
 	return 0;
 }
-
-
-
-
-
-
 

@@ -42,8 +42,13 @@ int main (int argc, char *argv[])
    */
   if (0 == nid) {
     sharedChar = (char *) sm_malloc (sizeof (char));
-    *sharedChar = 'A';
+    
   }
+
+  if(0!=nid)
+    *sharedChar = 'A';
+
+  
   sm_bcast ((void **) &sharedChar, 0);
   /* Checkpoint A */
   printf ("node %d: 1st shared variable is at %p.\n", nid, sharedChar);
