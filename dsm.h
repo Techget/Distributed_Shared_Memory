@@ -10,7 +10,6 @@ typedef sem_t Semaphore;
 typedef struct Shared{
 	int barrier_counter;
 	int online_counter;
-	// int n;
 	Semaphore *mutex;
 }Shared;
 

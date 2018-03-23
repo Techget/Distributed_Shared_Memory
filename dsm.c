@@ -149,14 +149,14 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	if (strcmp(host_name, LOCALHOST) == 0) {
 		if (fork() == 0) {
 			execvp(argv_remote[2], &argv_remote[2]);
-			write_to_log("dsm.c 149, should not reach here after execvp, something wrong with local remote process execution\n");
+			write_to_log("should not reach here after execvp, something wrong with local remote process execution\n");
 			exit(EXIT_FAILURE);
 		}
 	} else {
 		// execute the command in a separate process
 		if (fork() == 0) {
 			execvp(argv_remote[0], argv_remote);
-			write_to_log("dsm.c 156, should not reach here, something wrong with remote process execution\n");
+			write_to_log("should not reach here, something wrong with remote process execution\n");
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -187,11 +187,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		if(strcmp(client_message, "sm_barrier")==0){
 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
 			(*(remote_node_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
-
-			// sem_wait(shared->mutex);
 			((*shared).barrier_counter)++;
-			// sem_post(shared->mutex);
-
 			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
 			
 			while((*(remote_node_table+node_n)).barrier_blocked) {
@@ -199,7 +195,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			}
 
 			debug_printf("child-process %d, after wait\n",node_n);
-
 			send(client_sock,client_message, strlen(client_message),0);
 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
 			node_n, client_message, strlen(client_message));
@@ -300,7 +295,6 @@ int main(int argc , char *argv[]) {
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	(*shared).barrier_counter = 0;
 	(*shared).online_counter = n_processes;
-	// (*shared).n = n_processes;
 	(*shared).mutex = make_semaphore(1);
 	
 	pids = (int *)mmap(NULL, sizeof(int)* n_processes, 
@@ -350,13 +344,11 @@ int main(int argc , char *argv[]) {
 	// wait until all the child-process exit, this line must be changed later.
 	while ((*shared).online_counter > 0) {
 		if ((*shared).barrier_counter == n_processes) {
-			// sem_wait(shared->mutex);
 			(*shared).barrier_counter = 0;
 			int i;
 			for(i=0; i<n_processes; i++) {
 				(*(remote_node_table + i)).barrier_blocked = 0;
 			}
-			// sem_post(shared->mutex);
 		}
 	}
 
