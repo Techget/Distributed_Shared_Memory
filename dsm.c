@@ -16,12 +16,18 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 #include "dsm.h"
 #include "sm_mem.h"
+
+
+
+#define DEBUG  // define DEBUG before sm_util.h
+
 #include "sm_util.h"
 
-#define DEBUG
+
 
 #define PORT_BASE 10000
 #define HOST_NAME_LENTH 128
@@ -33,10 +39,6 @@ static struct Shared* shared;
 static struct Shared_Mem* shared_mem;
 
 static struct remote_node * remote_node_table;
-
-
-
-
 static FILE * log_file_fp;
 
 
@@ -57,13 +59,11 @@ void cleanUp(int n_processes) {
 	}
 
 	munmap(shared, sizeof(struct Shared));
-	munmap(shared_mem, sizeof(struct Shared_Mem));
-
-
+	static struct Shared_Mem* shared_mem;
 }
 
 
-void child_process_main(int node_n, int n_processes, char * host_name, 
+void childProcessMain(int node_n, int n_processes, char * host_name, 
 	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {	
 	// Side Note, after fork, the pointer also point to the same virtual addr, tested.
 	// remote program args format ./executable [ip] [port] [n_processes] [nid] [option1] [option2]...
@@ -73,7 +73,6 @@ void child_process_main(int node_n, int n_processes, char * host_name,
     int i = 0;
     int port;
     port = PORT_BASE + node_n;
-
 
     /* get local ip address */
  	char local_hostname[HOST_NAME_LENTH];
@@ -155,22 +154,21 @@ void child_process_main(int node_n, int n_processes, char * host_name,
         exit(EXIT_FAILURE);
     }
 
-	char client_message[DATA_SIZE];
-	
+    char client_message[DATA_SIZE];
+debug_printf("child-process %d",
+					node_n);
     while(1) {
 		memset(client_message, 0,DATA_SIZE );
 		int num = recv(client_sock, client_message, DATA_SIZE, 0);
 		if (num == -1) {
-		        perror("recv");
-		        exit(1);
-		}
-		else if (num == 0) {
-		        debug_printf("child-process %d Connection closed\n", node_n);
-		        break;
+	        perror("recv");
+	        exit(1);
+		} else if (num == 0) {
+	        debug_printf("child-process %d Connection closed\n", node_n);
+	        break;
 		}
 		debug_printf("child-process %d, msg Received %s\n", node_n, client_message);
-
-
+		
 		if(strcmp(client_message, "sm_barrier")==0){
 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
 			(*(remote_node_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
@@ -184,8 +182,7 @@ void child_process_main(int node_n, int n_processes, char * host_name,
 			debug_printf("child-process %d, after wait\n",node_n);
 			send(client_sock,client_message, strlen(client_message),0);
 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
-node_n, client_message, strlen(client_message));
-
+			node_n, client_message, strlen(client_message));
 		}else if(strncmp(client_message, "sm_malloc", 9)==0){
 			long alloc_size = get_number(client_message);
 			debug_printf("child-process %d, start process sm_malloc (%d)\n", node_n, alloc_size);
@@ -195,16 +192,17 @@ node_n, client_message, strlen(client_message));
 			send(client_sock,client_message, strlen(client_message),0);
 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
 					node_n, client_message, strlen(client_message));
-
 		}else if(strcmp(client_message, "sm_bcast")==0){
 			continue;
 		}
 	}/* end while */
 
 	close(client_sock);
+	((*shared).online_counter)--;
 
     debug_printf("child-process %d exit\n", node_n);
     while(wait(NULL)>0) {}
+    exit(0);
 }
 
 
@@ -220,7 +218,7 @@ int main(int argc , char *argv[]) {
 	char * log_file = NULL;
 	char * executable_file = NULL;
 	int n_processes = 1;
-	char **clnt_program_options = NULL;
+	char ** clnt_program_options = NULL;
 	int n_clnt_program_option = 0;
 	
 	/**************** read arguments with getOpt ***************/
@@ -284,19 +282,16 @@ int main(int argc , char *argv[]) {
 		host_file = LOCALHOST;
 	}
 
-
-
-	/************************* create shared resources *******************/
-	
-shared = (struct Shared *)mmap(NULL, sizeof(struct Shared), 
+	/************************* initialize shared memory ******************/
+	shared = (struct Shared *)mmap(NULL, sizeof(struct Shared), 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	(*shared).barrier_counter = 0;
 	(*shared).online_counter = n_processes;
 
-
-
+	
 	remote_node_table = (struct remote_node *)mmap(NULL, sizeof(struct remote_node)*n_processes, 
-PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
 
 	shared_mem = (struct Shared_Mem *)mmap(NULL, sizeof(struct Shared_Mem), 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
@@ -306,12 +301,6 @@ PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 	shared_mem->pointer = (char*)create_mmap(-1); // -1 indicates parent, test only
-
-
-
-
-
-	/************************* fork child processes *******************/
 
 	/************************* fork child processes *******************/
 	FILE * fp = NULL;
@@ -339,23 +328,28 @@ PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 		
 		int pid = fork();
 		if (pid == 0) {
-	        child_process_main(i, n_processes, host_name, executable_file, 
+	        childProcessMain(i, n_processes, host_name, executable_file, 
 	        	clnt_program_options, n_clnt_program_option);
 	        exit(0);
 	    } else {
-	   		
+
 	   		(*(remote_node_table + i)).barrier_blocked = 0;
 	    }
 	}
 	if (fp != NULL) {
 		fclose(fp);	
-}
-
+	}
 
 	/******************* allocator start working *********************/ 
 	// wait until all the child-process exit, this line must be changed later.
-	while (wait(NULL) > 0) {
-		debug_printf("waiting child processes\n");
+	while ((*shared).online_counter > 0) {
+		if ((*shared).barrier_counter == n_processes) {
+			(*shared).barrier_counter = 0;
+			int i;
+			for(i=0; i<n_processes; i++) {
+				(*(remote_node_table + i)).barrier_blocked = 0;
+			}
+		}
 	}
 
 	/******************* clean up resources and exit *******************/
@@ -363,4 +357,5 @@ PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	debug_printf("Exiting allocator\n");
 	return 0;
 }
+
 

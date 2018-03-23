@@ -4,11 +4,14 @@
 /**
 *	Data structure to record remote node in allocator
 */
+
+
 typedef struct Shared{
 	int barrier_counter;
 	int online_counter;
 
 }Shared;
+
 
 
 typedef struct Shared_Mem{
@@ -17,10 +20,10 @@ typedef struct Shared_Mem{
 }Shared_Mem;
 
 
+
 struct remote_node {
 	int barrier_blocked;
 };
-
 
 /**
 *	print to stdout the helper info.
