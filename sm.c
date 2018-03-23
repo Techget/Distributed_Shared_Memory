@@ -20,11 +20,20 @@ void handler (int signum, siginfo_t *si, void *ctx)
     printf ("Panic!");
     exit (1);
   }
-  printf ("Caught a SEGV...\n");
   addr = si->si_addr;         /* here we get the fault address */
-  printf ("...and the offending address is %p.\n", addr);
 
-  exit (0);
+    if (sock == -1) {
+        printf("Run sm_node_init first\n");
+        return;
+    }
+
+    char message[DATA_SIZE];
+    memset(message, 0, DATA_SIZE);
+    sprintf(message, "Caught a SEGV...and the offending address is %p.\n", addr);
+    send(sock, message, strlen(message) , 0);
+
+
+    exit (0);
 }
 
 
@@ -66,6 +75,11 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
         (*argv)[i] = (*argv)[i+4];
     }
     (*argc) -= extra_arguments;
+
+
+    signaction_init();
+
+
     return 0;
 }
 
@@ -113,12 +127,11 @@ void *sm_malloc (size_t size){
     char message[DATA_SIZE], server_reply[DATA_SIZE];
     memset(message, 0, DATA_SIZE);
     sprintf(message, "sm_malloc=%d", size);
-    send(sock, message, strlen(message) , 0);
+    //send(sock, message, strlen(message) , 0);
 
-    memset(server_reply, 0, DATA_SIZE);
-    int temp = recv(sock, server_reply, DATA_SIZE, 0);
+    
 
-    //return server_reply;
+    return malloc(size);
 
 }
 
