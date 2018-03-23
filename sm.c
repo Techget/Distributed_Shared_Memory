@@ -79,7 +79,7 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
     for (i = 1; i+extra_arguments<(*argc)-1; i++) {
         (*argv)[i] = (*argv)[i+4];
     }
-    (*argc) -= extra_arguments;
+(*argc) -= extra_arguments;
 
 
     signaction_init();
@@ -104,11 +104,10 @@ void sm_barrier(void) {
         printf("Run sm_node_init first\n");
         return;
     }
-    static int session = 0;
 
     char message[DATA_SIZE], server_reply[DATA_SIZE];
     memset(message, 0, DATA_SIZE);
-    sprintf(message, "sm_barrier%d", session++);
+    sprintf(message, "sm_barrier");
     send(sock, message, strlen(message) , 0);
     //printf("client send message: %s\n", message);
     memset(server_reply, 0, DATA_SIZE);
@@ -117,7 +116,6 @@ void sm_barrier(void) {
         printf("sm_barrier error\n");
         exit(0);
     }
-    //printf("client receive message: %s\n", server_reply);
 }
 
 

@@ -5,13 +5,9 @@
 *	Data structure to record remote node in allocator
 */
 typedef struct Shared{
-	int recv_flag;
-	int counter1;
-	int counter2;
-	int n;
-	int session;
-	int unblockID;
-	int* pids;
+	int barrier_counter;
+	int online_counter;
+
 }Shared;
 
 
@@ -22,10 +18,9 @@ typedef struct Shared_Mem{
 
 
 struct remote_node {
-	int id;
-	int online_flag;
-	int synchronization_step; // be aware of overflow
+	int barrier_blocked;
 };
+
 
 /**
 *	print to stdout the helper info.

@@ -21,8 +21,8 @@
 #include "sm_mem.h"
 #include "sm_util.h"
 
+#define DEBUG
 
-#define DATA_SIZE 1024
 #define PORT_BASE 10000
 #define HOST_NAME_LENTH 128
 #define OPTION_LENTH 128
@@ -32,19 +32,12 @@
 static struct Shared* shared;
 static struct Shared_Mem* shared_mem;
 
-static pthread_mutex_t mutex1;
-static pthread_mutexattr_t attrmutex1;
-static pthread_mutex_t mutex2;
-static pthread_mutexattr_t attrmutex2;
+static struct remote_node * remote_node_table;
+
+
 
 
 static FILE * log_file_fp;
-
-
-
-
-
-
 
 
 
@@ -81,18 +74,17 @@ void child_process_main(int node_n, int n_processes, char * host_name,
     int port;
     port = PORT_BASE + node_n;
 
+
     /* get local ip address */
  	char local_hostname[HOST_NAME_LENTH];
     gethostname(local_hostname, HOST_NAME_LENTH);
 	struct hostent *he;
-	struct in_addr **addr_list;	
-
+	struct in_addr **addr_list;		
 	if ((he = gethostbyname(local_hostname)) == NULL) {
-		printf("no ip address obtained\n");
+		// printf("no ip address obtained\n");
 		write_to_log("no ip address obtained\n");
 		exit(EXIT_FAILURE);
 	}
-
 	addr_list = (struct in_addr **) he->h_addr_list;
 	for(i = 0; addr_list[i] != NULL; i++) {
 		strcpy(ip , inet_ntoa(*addr_list[i]));
@@ -131,7 +123,6 @@ void child_process_main(int node_n, int n_processes, char * host_name,
 	sprintf(argv_remote[5], "%d", n_processes);
 	sprintf(argv_remote[6], "%d", node_n);
 
-
 	for(i=0; i<n_clnt_program_option; i++) {
 		memcpy(argv_remote[i+n_EXTRA_ARG-1], 
 			*(clnt_program_options + i), 
@@ -143,14 +134,14 @@ void child_process_main(int node_n, int n_processes, char * host_name,
 	if (strcmp(host_name, LOCALHOST) == 0) {
 		if (fork() == 0) {
 			execvp(argv_remote[2], &argv_remote[2]);
-			write_to_log("dsm.c 149, should not reach here after execvp, something wrong with local remote process execution\n");
+			write_to_log("should not reach here after execvp, something wrong with local remote process execution\n");
 			exit(EXIT_FAILURE);
 		}
 	} else {
 		// execute the command in a separate process
 		if (fork() == 0) {
 			execvp(argv_remote[0], argv_remote);
-			write_to_log("dsm.c 156, should not reach here, something wrong with remote process execution\n");
+			write_to_log("should not reach here, something wrong with remote process execution\n");
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -164,12 +155,9 @@ void child_process_main(int node_n, int n_processes, char * host_name,
         exit(EXIT_FAILURE);
     }
 
-    char client_message[DATA_SIZE];
-	char barrier_message[DATA_SIZE];
+	char client_message[DATA_SIZE];
 	
     while(1) {
-		if(!shared->recv_flag) continue; // not receving when shared->recv_flag==0
-
 		memset(client_message, 0,DATA_SIZE );
 		int num = recv(client_sock, client_message, DATA_SIZE, 0);
 		if (num == -1) {
@@ -182,59 +170,21 @@ void child_process_main(int node_n, int n_processes, char * host_name,
 		}
 		debug_printf("child-process %d, msg Received %s\n", node_n, client_message);
 
-		pthread_mutex_lock(&mutex2);// lock
-		debug_printf("child-process %d, session: %d\n", node_n, shared->session);
-		memset(barrier_message, 0, DATA_SIZE);
-		sprintf(barrier_message, "sm_barrier%d", shared->session);
 
-		pthread_mutex_unlock(&mutex2);// unlock
-
-		if(strcmp(client_message, barrier_message)==0){
+		if(strcmp(client_message, "sm_barrier")==0){
 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
-
-			pthread_mutex_lock(&mutex1); // lock
-			shared->counter1++;
-			debug_printf("child-process %d, counter1: %d\n",node_n, shared->counter1);
-			if(shared->counter1 == shared->n){
-				shared->counter1 = 0;
-				shared->unblockID = node_n;
-				shared->recv_flag = 0; // disallow receving
-				debug_printf("child-process %d, empty counter1\n",node_n);
-				for(i=0; i<n_processes; ++i){
-					// send signal to all child to continue from SIGSTOP
-					if(i==node_n)	continue;
-					usleep(2000);
-					debug_printf("child-process %d, send signal %d\n", node_n, *(shared->pids + i))
-					kill(*(shared->pids + i), SIGCONT); 
-				}
+			(*(remote_node_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
+			((*shared).barrier_counter)++;
+			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
+			
+			while((*(remote_node_table+node_n)).barrier_blocked) {
+				sleep(0);
 			}
 
-
-			debug_printf("child-process %d, wait, unblockID: %d\n",node_n, shared->unblockID);
-			if(node_n!=shared->unblockID){
-				// stop process and wait, do not block itself when counter==0
-				raise(SIGSTOP);
-				pthread_mutex_unlock(&mutex1); // unlock
-			}else{
-				shared->unblockID = -1;
-				pthread_mutex_unlock(&mutex1); // unlock
-			}
 			debug_printf("child-process %d, after wait\n",node_n);
-
-			pthread_mutex_lock(&mutex2);// lock
-			shared->counter2++;
-			debug_printf("child-process %d, counter2: %d\n",node_n, shared->counter2);
-
 			send(client_sock,client_message, strlen(client_message),0);
 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
-			node_n, client_message, strlen(client_message));
-			if(shared->counter2 == shared->n){
-				shared->counter2 = 0;
-				shared->session++;
-				shared->recv_flag = 1; // allow receving
-			}
-			debug_printf("child-process %d, session: %d\n", node_n, shared->session);
-			pthread_mutex_unlock(&mutex2);// unlock
+node_n, client_message, strlen(client_message));
 
 		}else if(strncmp(client_message, "sm_malloc", 9)==0){
 			long alloc_size = get_number(client_message);
@@ -338,39 +288,32 @@ int main(int argc , char *argv[]) {
 
 	/************************* create shared resources *******************/
 	
-	shared = (struct Shared *)mmap(NULL, sizeof(struct Shared), 
+shared = (struct Shared *)mmap(NULL, sizeof(struct Shared), 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	(*shared).recv_flag = 1;
-	(*shared).counter1 = 0;
-	(*shared).counter2 = 0;
-	(*shared).n = n_processes;
-	(*shared).session = 0;
+	(*shared).barrier_counter = 0;
+	(*shared).online_counter = n_processes;
+
+
+
+	remote_node_table = (struct remote_node *)mmap(NULL, sizeof(struct remote_node)*n_processes, 
+PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 	shared_mem = (struct Shared_Mem *)mmap(NULL, sizeof(struct Shared_Mem), 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	(*shared_mem).pointer = NULL;
 
-
-	
-	pthread_mutexattr_init(&attrmutex1);
-	pthread_mutexattr_setpshared(&attrmutex1, PTHREAD_PROCESS_SHARED);
-	pthread_mutex_init(&mutex1, &attrmutex1);
-
-	pthread_mutexattr_init(&attrmutex2);
-	pthread_mutexattr_setpshared(&attrmutex2, PTHREAD_PROCESS_SHARED);
-	pthread_mutex_init(&mutex2, &attrmutex2);
-
-
 	shared_mem->pointer = (char *)mmap(NULL, sizeof(char), 
 		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
 
 	shared_mem->pointer = (char*)create_mmap(-1); // -1 indicates parent, test only
 
 
 
+
+
 	/************************* fork child processes *******************/
 
+	/************************* fork child processes *******************/
 	FILE * fp = NULL;
 	if (strcmp(host_file, LOCALHOST) != 0) {
 		fp = fopen(host_file, "r");
@@ -394,19 +337,19 @@ int main(int argc , char *argv[]) {
 			host_name = LOCALHOST;
 		}
 		
-		if (fork() == 0) {
-			*(shared->pids + i) = getpid();
+		int pid = fork();
+		if (pid == 0) {
 	        child_process_main(i, n_processes, host_name, executable_file, 
 	        	clnt_program_options, n_clnt_program_option);
-
-			exit(0);
+	        exit(0);
+	    } else {
+	   		
+	   		(*(remote_node_table + i)).barrier_blocked = 0;
 	    }
 	}
 	if (fp != NULL) {
 		fclose(fp);	
-	}
-	/******************* create shared memory *********************/ 
-
+}
 
 
 	/******************* allocator start working *********************/ 
