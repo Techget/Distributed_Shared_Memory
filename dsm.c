@@ -20,7 +20,7 @@
 
 #include "dsm.h"
 
-#define DEBUG
+// #define DEBUG
 #ifdef DEBUG
 # define debug_printf(...) printf( __VA_ARGS__ );
 #else
@@ -55,10 +55,6 @@ Semaphore *make_semaphore (int n)
 	return sem;
 }
 
-int sem_signal(Semaphore *sem){
-	return sem_post(sem);
-}
-
 void write_to_log(const char * s) {
 	if (log_file_fp != NULL) {
 		fprintf(log_file_fp, "%s", s);
@@ -73,7 +69,7 @@ void cleanUp(int n_processes) {
 	if (log_file_fp != NULL) {
 		fclose(log_file_fp);
 	}
-	// sem_destroy(shared->mutex);
+	sem_destroy(shared->mutex);
 	munmap(shared, sizeof(struct Shared));
 	munmap(pids, sizeof(int)*n_processes);
 }
@@ -290,7 +286,7 @@ int main(int argc , char *argv[]) {
 		host_file = LOCALHOST;
 	}
 
-	/************************* fork child processes *******************/
+	/************************* initialize shared memory ******************/
 	shared = (struct Shared *)mmap(NULL, sizeof(struct Shared), 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	(*shared).barrier_counter = 0;
@@ -302,7 +298,8 @@ int main(int argc , char *argv[]) {
 
 	remote_node_table = (struct remote_node *)mmap(NULL, sizeof(struct remote_node)*n_processes, 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	
+
+	/************************* fork child processes *******************/
 	FILE * fp = NULL;
 	if (strcmp(host_file, LOCALHOST) != 0) {
 		fp = fopen(host_file, "r");
