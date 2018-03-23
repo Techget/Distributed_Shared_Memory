@@ -19,13 +19,8 @@
 
 #include "dsm.h"
 #include "sm_mem.h"
+#include "sm_util.h"
 
-#define DEBUG
-#ifdef DEBUG
-# define debug_printf(...) printf( __VA_ARGS__ );
-#else
-# define debug_printf(...) do {} while(0)
-#endif
 
 #define DATA_SIZE 1024
 #define PORT_BASE 10000
@@ -35,8 +30,10 @@
 #define LOCALHOST "localhost"
 
 static struct Shared* shared;
+static struct Shared_Mem* shared_mem;
+
+
 static int* pids;
-static int unblockID;
 static pthread_mutex_t mutex1;
 static pthread_mutexattr_t attrmutex1;
 static pthread_mutex_t mutex2;
@@ -44,6 +41,17 @@ static pthread_mutexattr_t attrmutex2;
 
 
 static FILE * log_file_fp;
+
+
+void child_send_message(int node_n, int sock, char *message, char *format, ...){
+	memset(message, 0, DATA_SIZE);
+	sprintf(message, format);
+	send(sock,message, strlen(message),0);
+	debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
+			node_n, message, strlen(message));
+}
+
+
 
 
 void write_to_log(const char * s) {
@@ -62,8 +70,9 @@ void cleanUp(int n_processes) {
 	}
 
 	munmap(shared, sizeof(struct Shared));
+	munmap(shared_mem, sizeof(struct Shared_Mem));
 	munmap(pids, sizeof(int)*n_processes);
-	munmap(&unblockID, sizeof(int));
+
 }
 
 
@@ -196,7 +205,7 @@ void child_process_main(int node_n, int n_processes, char * host_name,
 			debug_printf("child-process %d, counter1: %d\n",node_n, shared->counter1);
 			if(shared->counter1 == shared->n){
 				shared->counter1 = 0;
-				unblockID = node_n;
+				shared->unblockID = node_n;
 				shared->recv_flag = 0; // disallow receving
 				debug_printf("child-process %d, empty counter1\n",node_n);
 				for(i=0; i<n_processes; ++i){
@@ -208,13 +217,13 @@ void child_process_main(int node_n, int n_processes, char * host_name,
 			}
 
 
-			debug_printf("child-process %d, wait, unblockID: %d\n",node_n, unblockID);
-			if(node_n!=unblockID){
+			debug_printf("child-process %d, wait, unblockID: %d\n",node_n, shared->unblockID);
+			if(node_n!=shared->unblockID){
 				// stop process and wait, do not block itself when counter==0
 				raise(SIGSTOP);
 				pthread_mutex_unlock(&mutex1); // unlock
 			}else{
-				unblockID = -1;
+				shared->unblockID = -1;
 				pthread_mutex_unlock(&mutex1); // unlock
 			}
 			debug_printf("child-process %d, after wait\n",node_n);
@@ -234,8 +243,16 @@ void child_process_main(int node_n, int n_processes, char * host_name,
 			debug_printf("child-process %d, session: %d\n", node_n, shared->session);
 			pthread_mutex_unlock(&mutex2);// unlock
 
-		}else if(strcmp(client_message, "sm_malloc")==0){
-			continue;
+		}else if(strncmp(client_message, "sm_malloc", 9)==0){
+			long alloc_size = get_number(client_message);
+			debug_printf("child-process %d, start process sm_malloc (%d)\n", node_n, alloc_size);
+
+			memset(client_message, 0, DATA_SIZE);
+			sprintf(client_message, "%d\n", shared_mem->pointer);
+			send(client_sock,client_message, strlen(client_message),0);
+			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
+					node_n, client_message, strlen(client_message));
+
 		}else if(strcmp(client_message, "sm_bcast")==0){
 			continue;
 		}
@@ -326,8 +343,8 @@ int main(int argc , char *argv[]) {
 
 
 
-
-	/************************* fork child processes *******************/
+	/************************* create shared resources *******************/
+	
 	shared = (struct Shared *)mmap(NULL, sizeof(struct Shared), 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	(*shared).recv_flag = 1;
@@ -336,13 +353,14 @@ int main(int argc , char *argv[]) {
 	(*shared).n = n_processes;
 	(*shared).session = 0;
 
+	shared_mem = (struct Shared_Mem *)mmap(NULL, sizeof(struct Shared_Mem), 
+	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	(*shared_mem).pointer = NULL;
+
+
 	pids = (int *)mmap(NULL, sizeof(int)* n_processes, 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	
-	unblockID = (int)mmap(NULL, sizeof(int), 
-	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	unblockID = -1;
-
 	pthread_mutexattr_init(&attrmutex1);
 	pthread_mutexattr_setpshared(&attrmutex1, PTHREAD_PROCESS_SHARED);
 	pthread_mutex_init(&mutex1, &attrmutex1);
@@ -350,6 +368,17 @@ int main(int argc , char *argv[]) {
 	pthread_mutexattr_init(&attrmutex2);
 	pthread_mutexattr_setpshared(&attrmutex2, PTHREAD_PROCESS_SHARED);
 	pthread_mutex_init(&mutex2, &attrmutex2);
+
+
+	shared_mem->pointer = (char *)mmap(NULL, sizeof(char), 
+		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+
+	shared_mem->pointer = (char*)create_mmap(-1); // -1 indicates parent, test only
+
+
+
+	/************************* fork child processes *******************/
 
 	FILE * fp = NULL;
 	if (strcmp(host_file, LOCALHOST) != 0) {
@@ -386,7 +415,6 @@ int main(int argc , char *argv[]) {
 	}
 	/******************* create shared memory *********************/ 
 
-	create_mmap(0);
 
 
 	/******************* allocator start working *********************/ 

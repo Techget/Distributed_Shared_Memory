@@ -14,6 +14,9 @@
 
 static int sock = -1;
 
+
+
+
 void handler (int signum, siginfo_t *si, void *ctx)
 {
   void *addr;
@@ -127,16 +130,19 @@ void *sm_malloc (size_t size){
         printf("Run sm_node_init first\n");
         return;
     }
+    char* alloc;
 
     char message[DATA_SIZE], server_reply[DATA_SIZE];
     memset(message, 0, DATA_SIZE);
-    sprintf(message, "sm_malloc=%d", size);
-    //send(sock, message, strlen(message) , 0);
+    sprintf(message, "sm_malloc%d", size);
+    send(sock, message, strlen(message) , 0);
 
+    memset(server_reply, 0, DATA_SIZE);
+    int temp = recv(sock, server_reply, DATA_SIZE, 0);
     
+    alloc = (char*)strtol(server_reply, NULL, 10);
 
-    return malloc(size);
-
+    return alloc;
 }
 
 

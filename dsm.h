@@ -6,13 +6,22 @@
 */
 
 
+
 typedef struct Shared{
 	int recv_flag;
 	int counter1;
 	int counter2;
 	int n;
 	int session;
+	int unblockID;
 }Shared;
+
+
+typedef struct Shared_Mem{
+	char* pointer;
+
+}Shared_Mem;
+
 
 struct remote_node {
 	int id;

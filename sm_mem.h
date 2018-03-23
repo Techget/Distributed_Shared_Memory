@@ -8,6 +8,6 @@
 #include <sys/mman.h>
 
 
-void create_mmap(int pid);
+void* create_mmap(int pid);
 
 #endif

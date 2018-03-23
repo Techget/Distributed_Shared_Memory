@@ -1,32 +1,31 @@
 #include "sm_mem.h"
 
+#define ADDR_BASE 0xe7500000
+#define PAGE_NUM 0x100
 
 
-void create_mmap(int pid){
-  int   pagesize;
-  char *mm_mem;
+void* create_mmap(int pid){
   int i;
+  char *address, *alloc;
+  long bytes;
+  unsigned char arr[20];
 
-  pagesize = getpagesize()*0x10000;
+  address = (char*)malloc(sizeof(char));
+  address = (char*)ADDR_BASE;
 
-  /* memory map the file
-   */
-  mm_mem = mmap (0, pagesize, PROT_READ | PROT_WRITE, 
-		 MAP_PRIVATE | MAP_ANONYMOUS, 
-		 -1, 0);   /* anonymous mapping doesn't need a file desc */
-  if (MAP_FAILED == mm_mem)
-    perror ("mmap");
+  bytes = getpagesize()*PAGE_NUM;
 
-  /* use the mapped memory
-   */
-  for(i=0; i< 26; ++i){
-    *(mm_mem+i )= 'A'+i;
+
+  alloc = mmap(address, bytes, PROT_READ | PROT_WRITE| PROT_EXEC,
+                     MAP_ANON | MAP_SHARED| MAP_FIXED, 0, 0);
+
+  if (alloc == MAP_FAILED) {
+    perror("mmap failed.....................................");
+    exit(0);
   }
 
-  printf ("child(%d) mm_mem = %p; *(mm_mem) = %c\n", pid, mm_mem, *(mm_mem+3));
+  printf("node %d: ..................addr after mmap: 0x%x\n",pid, address);
+  printf("node %d: ............................alloc: 0x%x\n",pid, alloc);
 
-  /* clean up
-   */
-  munmap (mm_mem, pagesize);
-
+  return alloc;
 }
