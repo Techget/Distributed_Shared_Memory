@@ -70,6 +70,6 @@ void sm_barrier(void) {
 		printf("sm_barrier error\n");
 		exit(0);
 	}
-	//printf("client receive message: %s\n", server_reply);
+	// printf("remote-node receive message: %s\n", server_reply);
 }
 

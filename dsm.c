@@ -20,7 +20,7 @@
 
 #include "dsm.h"
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 # define debug_printf(...) printf( __VA_ARGS__ );
 #else
@@ -72,7 +72,7 @@ void cleanUp(int n_processes) {
 	if (log_file_fp != NULL) {
 		fclose(log_file_fp);
 	}
-	sem_destroy(shared->mutex);
+	// sem_destroy(shared->mutex);
 	munmap(shared, sizeof(struct Shared));
 	munmap(pids, sizeof(int)*n_processes);
 }
@@ -131,7 +131,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	}
 	sprintf(argv_remote[0], "%s","ssh");
 	sprintf(argv_remote[1], "%s", host_name);
-	sprintf(argv_remote[2], "./%s", executable_file);
+	sprintf(argv_remote[2], "%s", executable_file);
 	memcpy(argv_remote[3], ip, strlen(ip) + 1);
 	sprintf(argv_remote[4], "%d", port);
 	sprintf(argv_remote[5], "%d", n_processes);
@@ -175,34 +175,19 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		memset(client_message, 0,DATA_SIZE );
 		int num = recv(client_sock, client_message, DATA_SIZE, 0);
 		if (num == -1) {
-		        perror("recv");
-		        exit(1);
-		}
-		else if (num == 0) {
-		        debug_printf("child-process %d Connection closed\n", node_n);
-		        break;
+	        perror("recv");
+	        exit(1);
+		} else if (num == 0) {
+	        debug_printf("child-process %d Connection closed\n", node_n);
+	        break;
 		}
 		debug_printf("child-process %d, msg Received %s\n", node_n, client_message);
 		
 		if(strcmp(client_message, "sm_barrier")==0){
 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
-			sem_wait(shared->mutex);
-			shared->counter++;
-		
-			if(shared->counter == shared->n){
-				shared->counter = 0;
-				for(i=0; i<n_processes; ++i){
-					// send signal to all child to continue from SIGSTOP
-					kill(*(pids + i), SIGCONT); 
-				}
-			}
-			sem_signal(shared->mutex);
-
-			debug_printf("child-process %d, wait\n",node_n);
-			if(shared->counter!=0){
-				// stop process and wait, do not block itself when counter==0
-				raise(SIGSTOP);
-			}
+			((*shared).barrier_counter)++;
+			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
+			raise(SIGTSTP);
 
 			debug_printf("child-process %d, after wait\n",node_n);
 
@@ -217,9 +202,11 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	}/* end while */
 
 	close(client_sock);
+	((*shared).online_counter)--;
 
     debug_printf("child-process %d exit\n", node_n);
     while(wait(NULL)>0) {}
+    exit(0);
 }
 
 
@@ -302,10 +289,11 @@ int main(int argc , char *argv[]) {
 	/************************* fork child processes *******************/
 	shared = (struct Shared *)mmap(NULL, sizeof(struct Shared), 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	(*shared).counter = 0;
-	(*shared).n = n_processes;
-	(*shared).mutex = make_semaphore(1);
-
+	(*shared).barrier_counter = 0;
+	(*shared).online_counter = n_processes;
+	// (*shared).n = n_processes;
+	// (*shared).mutex = make_semaphore(1);
+	
 	pids = (int *)mmap(NULL, sizeof(int)* n_processes, 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	
@@ -332,21 +320,75 @@ int main(int argc , char *argv[]) {
 			host_name = LOCALHOST;
 		}
 		
-		if (fork() == 0) {
+		int pid = fork();
+		if (pid == 0) {
 	        childProcessMain(i, n_processes, host_name, executable_file, 
 	        	clnt_program_options, n_clnt_program_option);
-			*(pids + i) = getpid();
-			exit(0);
+	    } else {
+	   		// do nothing
+	   		*(pids + i) = pid;
 	    }
 	}
 	if (fp != NULL) {
 		fclose(fp);	
 	}
 
+	// for(i=0; i<n_processes; i++) {
+	// 	printf("*(pids+%d): %d\n", i, *(pids+i));
+	// }
+
 	/******************* allocator start working *********************/ 
 	// wait until all the child-process exit, this line must be changed later.
-	while (wait(NULL) > 0) {
-		debug_printf("waiting child processes\n");
+	while ((*shared).online_counter > 0) {
+		int status;
+		// for(i = 0; i < n_processes; i++) {
+		// 	waitpid(*(pids+i), &status, WUNTRACED | WCONTINUED | WNOHANG);
+		// 	printf("main loop, *(pids+%d): %d, stopped: %d, continued: %d\n", i, *(pids+i), WIFSTOPPED(status), WIFCONTINUED(status));
+		// }
+		// printf("main loop, online_counter: %d\n", (*shared).online_counter);
+		if ((*shared).barrier_counter == n_processes) {
+			// int status, i;
+			// int sig_continue_flag = 1;
+			// for(i = 0; i < n_processes; i++) {
+			// 	waitpid(*(pids+i), &status, WUNTRACED | WNOHANG);
+			// 	// printf("*(pids+%d): %d, stopped: %d, continued: %d\n",i,*(pids+i), WIFSTOPPED(status), WIFCONTINUED(status));
+			// 	if (WIFEXITED(status)) {
+			// 		continue;
+			// 	}
+			// 	if (!WIFSTOPPED(status)) {
+			// 		 printf("exited:    %d status: %d\n"
+			//              "signalled: %d signal: %d\n"
+			//              "stopped:   %d signal: %d\n"
+			//              "continued: %d\n",
+			//              WIFEXITED(status),
+			//              WEXITSTATUS(status),
+			//              WIFSIGNALED(status),
+			//              WTERMSIG(status),
+			//              WIFSTOPPED(status),
+			//              WSTOPSIG(status),
+			//              WIFCONTINUED(status));
+			// 		// kill(*(pids+i), SIGTSTP);
+			// 		sig_continue_flag = 0;
+			// 		break;
+			// 	}
+			// }
+			// if (sig_continue_flag) {
+			// 	(*shared).barrier_counter = 0;
+			// 	printf("set barrier_counter to 0: %d\n", (*shared).barrier_counter);
+			// 	for(i=0; i<n_processes; i++){
+			// 		kill(*(pids + i), SIGCONT); 
+			// 		// waitpid(*(pids+i), &status, WUNTRACED | WCONTINUED | WNOHANG);
+			// 		// printf("send SIGCONT, *(pids+i): %d, stopped: %d, continued: %d\n",*(pids+i), WIFSTOPPED(status), WIFCONTINUED(status));
+			// 	}
+			// }	
+			(*shared).barrier_counter = 0;
+			// printf("set barrier_counter to 0: %d\n", (*shared).barrier_counter);
+			for(i=0; i<n_processes; i++){
+				kill(*(pids + i), SIGCONT); 
+				// waitpid(*(pids+i), &status, WUNTRACED | WCONTINUED | WNOHANG);
+				// printf("send SIGCONT, *(pids+i): %d, stopped: %d, continued: %d\n",*(pids+i), WIFSTOPPED(status), WIFCONTINUED(status));
+			}
+		}
 	}
 
 	/******************* clean up resources and exit *******************/

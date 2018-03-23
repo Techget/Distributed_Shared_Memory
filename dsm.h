@@ -8,15 +8,14 @@
 typedef sem_t Semaphore;
 
 typedef struct Shared{
-	int counter;
-	int n;
-	Semaphore *mutex;
+	int barrier_counter;
+	int online_counter;
+	// int n;
+	// Semaphore *mutex;
 }Shared;
 
 struct remote_node {
-	int id;
-	int online_flag;
-	int synchronization_step; // be aware of overflow
+	int barrier_step; // be aware of overflow
 };
 
 /**
