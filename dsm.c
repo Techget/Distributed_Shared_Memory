@@ -27,7 +27,6 @@
 #include "sm_util.h"
 
 
-
 #define PORT_BASE 10000
 #define HOST_NAME_LENTH 128
 #define OPTION_LENTH 128
@@ -36,7 +35,6 @@
 
 static struct Shared* shared;
 static struct Shared_Mem* shared_mem;
-
 static struct remote_node * remote_node_table;
 static FILE * log_file_fp;
 
@@ -150,8 +148,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     }
 
     char client_message[DATA_SIZE];
-debug_printf("child-process %d",
-					node_n);
+	debug_printf("child-process %d", node_n);
     while(1) {
 		memset(client_message, 0,DATA_SIZE );
 		int num = recv(client_sock, client_message, DATA_SIZE, 0);
@@ -191,16 +188,16 @@ debug_printf("child-process %d",
 
 		}else if(strncmp(client_message, "sm_bcast", 8)==0){
 			long address = get_number(client_message);
-			int root_node = 
+			// int root_node = 
 			debug_printf("child-process %d, start process sm_bcast (%x)\n", node_n, address);
 
-			if(node_n==root_node){
+			// if(node_n==root_node){
 
 
-			}else{
+			// }else{
 
-				send
-			}
+			// 	// send
+			// }
 
 
 
@@ -298,7 +295,6 @@ int main(int argc , char *argv[]) {
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	(*shared).barrier_counter = 0;
 	(*shared).online_counter = n_processes;
-
 	
 	remote_node_table = (struct remote_node *)mmap(NULL, sizeof(struct remote_node)*n_processes, 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
@@ -312,6 +308,7 @@ int main(int argc , char *argv[]) {
 		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 	shared_mem->pointer = (char*)create_mmap(-1); // -1 indicates parent, test only
+
 
 	/************************* fork child processes *******************/
 	FILE * fp = NULL;
@@ -343,7 +340,6 @@ int main(int argc , char *argv[]) {
 	        	clnt_program_options, n_clnt_program_option);
 	        exit(0);
 	    } else {
-
 	   		(*(remote_node_table + i)).barrier_blocked = 0;
 	    }
 	}

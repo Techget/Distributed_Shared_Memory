@@ -9,14 +9,11 @@
 typedef struct Shared{
 	int barrier_counter;
 	int online_counter;
-
 }Shared;
-
 
 
 typedef struct Shared_Mem{
 	char* pointer;
-
 }Shared_Mem;
 
 
