@@ -2,13 +2,22 @@
 
 
 
+
+
+
+void printHelpMsg() {
+	printf(" Usage: dsm [OPTION]... EXECUTABLE-FILE NODE-OPTION...\n");
+}
+
+
 /* Extract oct number from string 
+	decode message with digit and '-' only, unable to decode hex
 */
 long get_number(char *str){
 	char *p = str;
 	long val;
 	while (*p) { 
-	    if (isdigit(*p)) { 
+	    if (isdigit(*p)||*p=='-') { 
 	        val = strtol(p, &p, 10); 
 	    } else { 
 	        p++;

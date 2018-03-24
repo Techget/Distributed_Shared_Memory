@@ -23,6 +23,7 @@
 
 long get_number(char *str);
 void tcp_send_message(int sock, char *format, ...);
-
+void write_to_log(const char * s);
+void printHelpMsg();
 
 #endif

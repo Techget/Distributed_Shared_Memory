@@ -24,7 +24,6 @@
 
 
 #define DEBUG  // define DEBUG before sm_util.h
-
 #include "sm_util.h"
 
 
@@ -42,16 +41,12 @@ static struct remote_node * remote_node_table;
 static FILE * log_file_fp;
 
 
-
 void write_to_log(const char * s) {
 	if (log_file_fp != NULL) {
 		fprintf(log_file_fp, "%s", s);
 	}
 }
 
-void printHelpMsg() {
-	printf(" Usage: dsm [OPTION]... EXECUTABLE-FILE NODE-OPTION...\n");
-}
 
 void cleanUp(int n_processes) {
 	if (log_file_fp != NULL) {
@@ -188,12 +183,18 @@ debug_printf("child-process %d",
 			debug_printf("child-process %d, start process sm_malloc (%d)\n", node_n, alloc_size);
 
 			memset(client_message, 0, DATA_SIZE);
-			sprintf(client_message, "%d\n", shared_mem->pointer);
+			sprintf(client_message, "%d", shared_mem->pointer);
 			send(client_sock,client_message, strlen(client_message),0);
-			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
-					node_n, client_message, strlen(client_message));
-		}else if(strcmp(client_message, "sm_bcast")==0){
-			continue;
+			debug_printf("child-process %d, msg being sent: %s, addr: 0x%x,  Number of bytes sent: %zu\n",
+					node_n, client_message, shared_mem->pointer, strlen(client_message));
+
+
+		}else if(strncmp(client_message, "sm_bcast", 8)==0){
+			long address = get_number(client_message);
+			debug_printf("child-process %d, start process sm_bcast (%x)\n", node_n, address);
+
+			
+
 		}
 	}/* end while */
 

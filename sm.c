@@ -159,7 +159,7 @@ void sm_bcast (void **addr, int root_nid){
 
     char message[DATA_SIZE], server_reply[DATA_SIZE];
     memset(message, 0, DATA_SIZE);
-    sprintf(message, "sm_bcast");
+    sprintf(message, "sm_bcast%d", *addr);
     send(sock, message, strlen(message) , 0);
 
 }
