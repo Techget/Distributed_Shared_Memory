@@ -44,17 +44,12 @@ int main (int argc, char *argv[])
     sharedChar = (char *) sm_malloc (sizeof (char));
     *sharedChar = 'A';
   }
-
-
-    
-
-
   sm_bcast ((void **) &sharedChar, 0);
   /* Checkpoint A */
   printf ("node %d: 1st shared variable is at %p.\n", nid, sharedChar);
   if (0 != nid)
     printf ("node %d: Value in 1st shared variable is %d\n", 
-	    nid, *sharedChar);
+      nid, *sharedChar);
   /* Checkpoint B */
   sm_barrier ();
 
@@ -68,10 +63,10 @@ int main (int argc, char *argv[])
   if (0 == nid)
     *sharedChar2 = 'B';
   /* Checkpoint D */
-  sm_barrier ();	/* make sure node #0 wrote the character */
+  sm_barrier ();  /* make sure node #0 wrote the character */
   if (0 != nid)
     printf ("node %d: Value in 2nd shared variable is %d\n", 
-	    nid, *sharedChar2);
+      nid, *sharedChar2);
   /* Checkpoint E */
 
   sm_barrier ();

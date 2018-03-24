@@ -4,8 +4,6 @@
 /**
 *	Data structure to record remote node in allocator
 */
-
-
 typedef struct Shared{
 	int barrier_counter;
 	int online_counter;
@@ -13,6 +11,8 @@ typedef struct Shared{
 
 
 typedef struct Shared_Mem{
+	int bcast_addr;
+
 	char* pointer;
 }Shared_Mem;
 

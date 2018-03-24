@@ -10,10 +10,13 @@
 #include "sm.h"
 #include "sm_mem.h"
 
+//#define DEBUG
+#include "sm_util.h"
+
 #define DATA_SIZE 1024
 
 static int sock = -1;
-
+static int node_id=-1;
 
 
 
@@ -79,8 +82,10 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
     for (i = 1; i+extra_arguments<(*argc)-1; i++) {
         (*argv)[i] = (*argv)[i+4];
     }
-(*argc) -= extra_arguments;
+    (*argc) -= extra_arguments;
 
+
+    node_id = *nid;
 
     signaction_init();
 
@@ -156,10 +161,27 @@ void sm_bcast (void **addr, int root_nid){
         printf("Run sm_node_init first\n");
         return;
     }
-
+    int address;
     char message[DATA_SIZE], server_reply[DATA_SIZE];
     memset(message, 0, DATA_SIZE);
-    sprintf(message, "sm_bcast%d", *addr);
-    send(sock, message, strlen(message) , 0);
+
+    if(root_nid == node_id){
+        sprintf(message, "sm_bcast%d", *addr);
+        send(sock, message, strlen(message) , 0);
+        debug_printf("node %d: send sm_bcast with addr: %p\n", node_id, *addr);
+    }else{
+        sprintf(message, "sm_bcast%d", 0);
+        send(sock, message, strlen(message) , 0);
+        debug_printf("node %d: send sm_bcast with addr: 0\n", node_id);
+    }
+    memset(server_reply, 0, DATA_SIZE);
+    int temp = recv(sock, server_reply, DATA_SIZE, 0);
+    
+    address = (int)strtol(server_reply, NULL, 10);
+    debug_printf("node %d: receive sm_bcast addr: %p\n", node_id, address);
+
+    if(root_nid != node_id){
+        *addr = (void*)address;
+    }
 
 }

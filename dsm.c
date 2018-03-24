@@ -187,21 +187,35 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
 
 		}else if(strncmp(client_message, "sm_bcast", 8)==0){
-			long address = get_number(client_message);
-			// int root_node = 
+			int address = get_number(client_message);
 			debug_printf("child-process %d, start process sm_bcast (%x)\n", node_n, address);
+			if(address!=0){
+				shared_mem->bcast_addr = address;
+			}
 
-			// if(node_n==root_node){
+			// barrier in sm_bcast
+			(*(remote_node_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
+			((*shared).barrier_counter)++;
+			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
+			
+			while((*(remote_node_table+node_n)).barrier_blocked) {
+				sleep(0);
+			}
+
+			debug_printf("child-process %d, after wait\n",node_n);
+			memset(client_message, 0, DATA_SIZE);
+			sprintf(client_message, "%d", shared_mem->bcast_addr);
+			send(client_sock,client_message, strlen(client_message),0);
+			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
+			node_n, client_message, strlen(client_message));
 
 
-			// }else{
+		}else if(strncmp(client_message, "read_fault", 8)==0){
+			continue;
 
-			// 	// send
-			// }
+		}else if(strncmp(client_message, "write_fault", 8)==0){
 
-
-
-
+			continue;
 		}
 	}/* end while */
 
@@ -302,6 +316,7 @@ int main(int argc , char *argv[]) {
 
 	shared_mem = (struct Shared_Mem *)mmap(NULL, sizeof(struct Shared_Mem), 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	(*shared_mem).bcast_addr = 0;
 	(*shared_mem).pointer = NULL;
 
 	shared_mem->pointer = (char *)mmap(NULL, sizeof(char), 
