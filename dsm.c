@@ -191,9 +191,19 @@ debug_printf("child-process %d",
 
 		}else if(strncmp(client_message, "sm_bcast", 8)==0){
 			long address = get_number(client_message);
+			int root_node = 
 			debug_printf("child-process %d, start process sm_bcast (%x)\n", node_n, address);
 
-			
+			if(node_n==root_node){
+
+
+			}else{
+
+				send
+			}
+
+
+
 
 		}
 	}/* end while */
