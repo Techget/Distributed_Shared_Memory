@@ -185,7 +185,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			debug_printf("child-process %d, msg being sent: %s, addr: 0x%x,  Number of bytes sent: %zu\n",
 					node_n, client_message, shared_mem->pointer, strlen(client_message));
 
-
 		}else if(strncmp(client_message, "sm_bcast", 8)==0){
 			int address = get_number(client_message);
 			debug_printf("child-process %d, start process sm_bcast (%x)\n", node_n, address);

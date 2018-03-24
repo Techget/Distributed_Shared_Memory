@@ -8,6 +8,7 @@ void* create_mmap(int pid){
   int i;
   char *address, *alloc;
   long bytes;
+  int prot;
   unsigned char arr[20];
 
   address = (char*)malloc(sizeof(char));
@@ -16,7 +17,13 @@ void* create_mmap(int pid){
   bytes = getpagesize()*PAGE_NUM;
 
 
-  alloc = mmap(address, bytes, PROT_READ | PROT_WRITE| PROT_EXEC,
+  if(pid = -1){ // allow full access in allocator
+    prot = PROT_READ | PROT_WRITE;
+  }else{        // no w/r access in client
+    prot = 0;
+  }
+
+  alloc = mmap(address, bytes,prot ,
                      MAP_ANON | MAP_SHARED| MAP_FIXED, 0, 0);
 
   if (alloc == MAP_FAILED) {
