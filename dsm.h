@@ -12,18 +12,10 @@ typedef struct Shared{
 
 typedef struct Shared_Mem{
 	int bcast_addr;
+
 	char* pointer;
 }Shared_Mem;
 
-
-struct child_process {
-	int barrier_blocked;
-	int client_sock;
-	int pid;
-	char client_message[DATA_SIZE];
-	int connected_flag;
-	int message_received_flag;
-};
 
 
 struct remote_node {

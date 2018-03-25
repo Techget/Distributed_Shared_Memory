@@ -52,58 +52,7 @@ void cleanUp(int n_processes) {
 	}
 
 	munmap(shared, sizeof(struct Shared));
-	munmap(shared_mem, sizeof(struct Shared_Mem));
-	munmap(child_process_table, n_processes * sizeof(struct child_process));
-}
-
-
-void child_process_SIGUSR1_handler(int signum, siginfo_t *si, void *ctx) {
-	int pid = getpid(); // use pid to get nid
-	int nid = 0;
-	for (nid=0; nid<(*shared).n_processes; nid++) {
-		if ((*(child_process_table+nid)).pid == pid) break;
-	}
-
-	memcpy((*(child_process_table+nid)).client_message, "hello world", 12);
-	send((*(child_process_table+nid)).client_sock,(*(child_process_table+nid)).client_message, 	
-		strlen((*(child_process_table+nid)).client_message),0);
-}
-
-
-void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
-	// printf("signum: %d, SIGIO: %d\n", signum, SIGIO);
-	// printf("inside child_process_SIGIO_handler, siginfo_t si_code: %d, POLL_IN: %d, POLL_OUT: %d, POLL_HUP: %d\n", 
-	// 	si->si_code, POLL_IN, POLL_OUT, POLL_HUP);
-	// NOTICE, the si_code always equal to 128, cannot use that to distinguish
-	// POLL_IN & POLL_OUT, however, seems only receive will enter this snippet
-
-	int pid = getpid(); // use pid to get nid
-	int nid = 0;
-	for (nid=0; nid<(*shared).n_processes; nid++) {
-		if ((*(child_process_table+nid)).pid == pid) break;
-	}
-
-	if (nid >= (*shared).n_processes) {
-		debug_printf("cannot find the nid\n");
-		exit(1);
-	}
-
-	memset((*(child_process_table+nid)).client_message, 0,DATA_SIZE );
-	int num = recv((*(child_process_table+nid)).client_sock,
-		(*(child_process_table+nid)).client_message, DATA_SIZE, 0);
-	printf("num: %d\n", num);
-	if (num == -1) {
-        perror("recv");
-        exit(1);
-	} else if (num == 0) {
-		(*(child_process_table+nid)).connected_flag = 0;
-		debug_printf("child process: %d, connection closed\n");
-		return;
-	}
-
-	(*(child_process_table+nid)).message_received_flag = 1;
-	debug_printf("child-process %d, msg Received %s\n", nid,
-		(*(child_process_table+nid)).client_message);
+	static struct Shared_Mem* shared_mem;
 }
 
 
@@ -198,63 +147,75 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
         exit(EXIT_FAILURE);
     }
 
-    (*(child_process_table+node_n)).client_sock = client_sock;
-    (*(child_process_table+node_n)).connected_flag = 1;
-    (*(child_process_table+node_n)).message_received_flag = 0;
-    // char client_message[DATA_SIZE];
- //    fcntl (client_sock, F_SETFL, O_ASYNC);
-	// fcntl (client_sock, F_SETOWN, getpid ());
-	// struct sigaction sa;
-	// sa.sa_handler = child_process_SIGIO_handler;
-	// sa.sa_flags   = 0;
-	// sigemptyset (&sa.sa_mask);
-	// sigaction (SIGPOLL, &sa, NULL);
-
-    fcntl( client_sock, F_SETOWN, getpid() );
-    // fcntl( client_sock, F_SETSIG, SIGIO );
-    fcntl( client_sock, F_SETFL, O_ASYNC );
-    struct sigaction sa;
-    memset( &sa, 0, sizeof(struct sigaction) );
-    sigemptyset( &sa.sa_mask );
-    sa.sa_sigaction = child_process_SIGIO_handler;
-    sa.sa_flags = SA_SIGINFO;
-    sigaction( SIGIO, &sa, NULL );
-
-    struct sigaction sa2;
-	sa2.sa_sigaction = child_process_SIGUSR1_handler;
-	sa2.sa_flags     = SA_SIGINFO;
-	sigemptyset (&sa2.sa_mask);
-	sigaction (SIGUSR1, &sa2, NULL);
-    
-
-    while((*(child_process_table+node_n)).connected_flag) {
-    	if(!(*(child_process_table+node_n)).message_received_flag) {
-    		continue;
-    	}
-
-		if(strcmp((*(child_process_table+node_n)).client_message, "sm_barrier")==0){
+    char client_message[DATA_SIZE];
+	debug_printf("child-process %d", node_n);
+    while(1) {
+		memset(client_message, 0,DATA_SIZE );
+		int num = recv(client_sock, client_message, DATA_SIZE, 0);
+		if (num == -1) {
+	        perror("recv");
+	        exit(1);
+		} else if (num == 0) {
+	        debug_printf("child-process %d Connection closed\n", node_n);
+	        break;
+		}
+		debug_printf("child-process %d, msg Received %s\n", node_n, client_message);
+		
+		if(strcmp(client_message, "sm_barrier")==0){
 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
-			(*(child_process_table+node_n)).barrier_blocked = 1; // the order is important for these two statement
+			(*(remote_node_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
 			((*shared).barrier_counter)++;
 			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
 			
-			while((*(child_process_table+node_n)).barrier_blocked) {
+			while((*(remote_node_table+node_n)).barrier_blocked) {
 				sleep(0);
 			}
 
 			debug_printf("child-process %d, after wait\n",node_n);
-			send(client_sock,(*(child_process_table+node_n)).client_message, 
-				strlen((*(child_process_table+node_n)).client_message),0);
+			send(client_sock,client_message, strlen(client_message),0);
 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
-				node_n, (*(child_process_table+node_n)).client_message, 
-				strlen((*(child_process_table+node_n)).client_message));
-		}else if(strcmp((*(child_process_table+node_n)).client_message, "sm_malloc")==0){
+			node_n, client_message, strlen(client_message));
+		}else if(strncmp(client_message, "sm_malloc", 9)==0){
+			long alloc_size = get_number(client_message);
+			debug_printf("child-process %d, start process sm_malloc (%d)\n", node_n, alloc_size);
+
+			memset(client_message, 0, DATA_SIZE);
+			sprintf(client_message, "%d", shared_mem->pointer);
+			send(client_sock,client_message, strlen(client_message),0);
+			debug_printf("child-process %d, msg being sent: %s, addr: 0x%x,  Number of bytes sent: %zu\n",
+					node_n, client_message, shared_mem->pointer, strlen(client_message));
+
+		}else if(strncmp(client_message, "sm_bcast", 8)==0){
+			int address = get_number(client_message);
+			debug_printf("child-process %d, start process sm_bcast (%x)\n", node_n, address);
+			if(address!=0){
+				shared_mem->bcast_addr = address;
+			}
+
+			// barrier in sm_bcast
+			(*(remote_node_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
+			((*shared).barrier_counter)++;
+			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
+			
+			while((*(remote_node_table+node_n)).barrier_blocked) {
+				sleep(0);
+			}
+
+			debug_printf("child-process %d, after wait\n",node_n);
+			memset(client_message, 0, DATA_SIZE);
+			sprintf(client_message, "%d", shared_mem->bcast_addr);
+			send(client_sock,client_message, strlen(client_message),0);
+			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
+			node_n, client_message, strlen(client_message));
+
+
+		}else if(strncmp(client_message, "read_fault", 8)==0){
 			continue;
-		}else if(strcmp((*(child_process_table+node_n)).client_message, "sm_bcast")==0){
+
+		}else if(strncmp(client_message, "write_fault", 8)==0){
+
 			continue;
 		}
-
-		(*(child_process_table+node_n)).message_received_flag = 0;
 	}/* end while */
 
 	close(client_sock);
@@ -262,8 +223,8 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
     debug_printf("child-process %d exit\n", node_n);
     while(wait(NULL)>0) {}
+    exit(0);
 }
-
 
 
 /*
@@ -362,8 +323,6 @@ int main(int argc , char *argv[]) {
 
 	shared_mem->pointer = (char*)create_mmap(-1); // -1 indicates parent, test only
 
-	child_process_table = (struct child_process *)mmap(NULL, sizeof(struct child_process)*n_processes, 
-PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 	/************************* fork child processes *******************/
 	FILE * fp = NULL;
@@ -396,8 +355,6 @@ PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	        exit(0);
 	    } else {
 	   		(*(remote_node_table + i)).barrier_blocked = 0;
-	   		(*(child_process_table + i)).barrier_blocked = 0;
-			memset((*(child_process_table + i)).client_message, 0,DATA_SIZE );
 	    }
 	}
 	if (fp != NULL) {
