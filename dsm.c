@@ -16,7 +16,7 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <fcntl.h>
+#include <semaphore.h>
 
 #include "dsm.h"
 #include "sm_mem.h"
@@ -35,7 +35,7 @@
 
 static struct Shared* shared;
 static struct Shared_Mem* shared_mem;
-static struct child_process * child_process_table;
+static struct remote_node * remote_node_table;
 static FILE * log_file_fp;
 
 
@@ -347,7 +347,9 @@ int main(int argc , char *argv[]) {
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	(*shared).barrier_counter = 0;
 	(*shared).online_counter = n_processes;
-	(*shared).n_processes = n_processes;
+	
+	remote_node_table = (struct remote_node *)mmap(NULL, sizeof(struct remote_node)*n_processes, 
+	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 
 	shared_mem = (struct Shared_Mem *)mmap(NULL, sizeof(struct Shared_Mem), 
@@ -393,7 +395,7 @@ PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	        	clnt_program_options, n_clnt_program_option);
 	        exit(0);
 	    } else {
-	   		(*(child_process_table + i)).pid = pid;
+	   		(*(remote_node_table + i)).barrier_blocked = 0;
 	   		(*(child_process_table + i)).barrier_blocked = 0;
 			memset((*(child_process_table + i)).client_message, 0,DATA_SIZE );
 	    }
@@ -409,7 +411,7 @@ PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 			(*shared).barrier_counter = 0;
 			int i;
 			for(i=0; i<n_processes; i++) {
-				(*(child_process_table + i)).barrier_blocked = 0;
+				(*(remote_node_table + i)).barrier_blocked = 0;
 			}
 		}
 	}
