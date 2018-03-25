@@ -204,7 +204,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     (*(child_process_table+node_n)).connected_flag = 1;
     (*(child_process_table+node_n)).message_received_flag = 0;
     // char client_message[DATA_SIZE];
- //    fcntl (client_sock, F_SETFL, O_ASYNC);
+	// fcntl (client_sock, F_SETFL, O_ASYNC);
 	// fcntl (client_sock, F_SETOWN, getpid ());
 	// struct sigaction sa;
 	// sa.sa_handler = child_process_SIGIO_handler;
