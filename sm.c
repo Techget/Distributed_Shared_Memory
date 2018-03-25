@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -18,9 +19,25 @@
 static int sock = -1;
 static int node_id=-1;
 
+void sigio_handler (int signum, siginfo_t *si, void *ctx)
+{
+    char server_reply[DATA_SIZE];
+    memset(server_reply, 0, DATA_SIZE);
+
+  if (SIGIO != signum) {
+    printf ("Panic!");
+    exit (1);
+  }
+  printf ("Caught a SIGIO..............................\n");
+    //int temp = recv(sock, server_reply, DATA_SIZE, 0);
+
+    //printf ("Message: %s\n", server_reply);
+
+    return;
+}
 
 
-void handler (int signum, siginfo_t *si, void *ctx)
+void segv_handler (int signum, siginfo_t *si, void *ctx)
 {
   void *addr;
 
@@ -44,14 +61,29 @@ void handler (int signum, siginfo_t *si, void *ctx)
     exit (0);
 }
 
+/*
+    Catch SEGV fault in client program
+*/
+void signaction_segv_init(){
+    struct sigaction sa;
 
-void signaction_init(){
-  struct sigaction sa;
+    sa.sa_sigaction = segv_handler;
+    sa.sa_flags     = SA_SIGINFO;
+    sigemptyset (&sa.sa_mask);
+    sigaction (SIGSEGV, &sa, NULL);       /* set the signal handler... */
 
-  sa.sa_sigaction = handler;
-  sa.sa_flags     = SA_SIGINFO;
-  sigemptyset (&sa.sa_mask);
-  sigaction (SIGSEGV, &sa, NULL);       /* set the signal handler... */
+}
+
+void signaction_sigio_init(){
+    struct sigaction sa;
+    memset( &sa, 0, sizeof(struct sigaction) );
+    sigemptyset( &sa.sa_mask );
+    sa.sa_sigaction = sigio_handler;
+    sa.sa_flags = SA_RESTART | SA_SIGINFO;
+    sigaction( SIGIO, &sa, NULL );
+    fcntl( sock, F_SETOWN, getpid() );
+    fcntl( sock, F_SETSIG, SIGIO );
+    fcntl( sock, F_SETFL, O_NONBLOCK | O_ASYNC );
 
 }
 
@@ -87,8 +119,8 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
 
     node_id = *nid;
 
-    signaction_init();
-
+    signaction_segv_init();
+    //signaction_sigio_init();
 
     create_mmap(*nid);
 
