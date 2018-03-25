@@ -16,7 +16,8 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <semaphore.h>
+#include <fcntl.h>
+#include <signal.h>
 
 #include "dsm.h"
 #include "sm_mem.h"
@@ -37,6 +38,11 @@ static struct Shared* shared;
 static struct Shared_Mem* shared_mem;
 static struct remote_node * remote_node_table;
 static FILE * log_file_fp;
+
+static char message[DATA_SIZE];
+static int message_set_flag = 0;
+
+
 
 
 void write_to_log(const char * s) {
@@ -146,6 +152,11 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
         write_to_log("Connection accept failed\n");
         exit(EXIT_FAILURE);
     }
+
+    /* non block socket*/
+	int flags = fcntl(client_sock, F_GETFL, 0);
+	fcntl(client_sock, F_SETFL, flags | O_NONBLOCK);
+
 
     char client_message[DATA_SIZE];
 	debug_printf("child-process %d", node_n);

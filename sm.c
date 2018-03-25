@@ -37,7 +37,9 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx)
     int temp = recv(sock, message_recv, DATA_SIZE, 0);
 
     printf ("Caught a SIGIO.................Message: %s\n", message_recv);
-    if(strcmp(message_recv, "EXCEPTION")!=0){
+    if(strcmp(message_recv, "EXCEPTION")==0){
+        // process exception
+    }else{
         strcpy(message, message_recv);
         message_set_flag = 1;
         debug_printf("set message_set_flag =1\n");
