@@ -1,7 +1,7 @@
 #ifndef	_DSM_H
 #define	_DSM_H
 
-// #define DEBUG
+#define DEBUG
 #ifdef DEBUG
 # define debug_printf(...) printf( __VA_ARGS__ );
 #else

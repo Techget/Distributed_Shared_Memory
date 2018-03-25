@@ -73,12 +73,6 @@ void child_process_SIGUSR1_handler(int signum, siginfo_t *si, void *ctx) {
 }
 
 void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
-	// printf("signum: %d, SIGIO: %d\n", signum, SIGIO);
-	// printf("inside child_process_SIGIO_handler, siginfo_t si_code: %d, POLL_IN: %d, POLL_OUT: %d, POLL_HUP: %d\n", 
-	// 	si->si_code, POLL_IN, POLL_OUT, POLL_HUP);
-	// NOTICE, the si_code always equal to 128, cannot use that to distinguish
-	// POLL_IN & POLL_OUT, however, seems only receive will enter this snippet
-
 	int pid = getpid(); // use pid to get nid
 	int nid = 0;
 	for (nid=0; nid<(*shared).n_processes; nid++) {
@@ -89,23 +83,48 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 		debug_printf("cannot find the nid\n");
 		exit(1);
 	}
+	printf("inside child_process_SIGIO_handler nid: %d, siginfo_t si_code: %d, si_band: %d, si_fd: %d, POLL_IN: %d, POLL_OUT: %d, POLL_HUP: %d\n", 
+		nid, si->si_code, si->si_band, si->si_fd, POLL_IN, POLL_OUT, POLL_HUP);
 
 	memset((*(child_process_table+nid)).client_message, 0,DATA_SIZE );
 	int num = recv((*(child_process_table+nid)).client_sock,
 		(*(child_process_table+nid)).client_message, DATA_SIZE, 0);
-	printf("num: %d\n", num);
+	// printf("num: %d\n", num);
 	if (num == -1) {
         perror("recv");
         exit(1);
 	} else if (num == 0) {
 		(*(child_process_table+nid)).connected_flag = 0;
-		debug_printf("child process: %d, connection closed\n");
+		debug_printf("child process: %d, connection closed\n", nid);
 		return;
 	}
+	// printf("num: %d\n", num);
 
-	(*(child_process_table+nid)).message_received_flag = 1;
+	(*(child_process_table+nid)).message_received_flag++;
 	debug_printf("child-process %d, msg Received %s\n", nid,
-		(*(child_process_table+nid)).client_message);
+		(*(child_process_table+nid)).client_message); 
+
+	// if(strcmp((*(child_process_table+nid)).client_message, "sm_barrier")==0){
+	// 	debug_printf("child-process %d, start process sm_barrier\n", nid);
+	// 	(*(child_process_table+nid)).barrier_blocked = 1; // the order is important for these two statement
+	// 	((*shared).barrier_counter)++;
+	// 	debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
+		
+	// 	while((*(child_process_table+nid)).barrier_blocked) {
+	// 		sleep(0);
+	// 	}
+
+	// 	debug_printf("child-process %d, after wait\n",nid);
+	// 	send((*(child_process_table+nid)).client_sock,(*(child_process_table+nid)).client_message, 
+	// 		strlen((*(child_process_table+nid)).client_message),0);
+	// 	// debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
+	// 	// 	node_n, (*(child_process_table+node_n)).client_message, 
+	// 	// 	strlen((*(child_process_table+node_n)).client_message));
+	// }else if(strcmp((*(child_process_table+nid)).client_message, "sm_malloc")==0){
+	// 	// continue;
+	// }else if(strcmp((*(child_process_table+nid)).client_message, "sm_bcast")==0){
+	// 	// continue;
+	// }	
 }
 
 
@@ -150,7 +169,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		port++;
 		server.sin_port = htons(port);	
     }
-    listen(socket_desc , 3);
+    listen(socket_desc , 1);
 
     /* prepare the args to execute program on remote node/local machine*/
     // extra args are: [./func name] [ip] [port] [n_processes] [nid] [options(doesnot counter)] [NULL]
@@ -195,7 +214,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	int c = sizeof(struct sockaddr_in); 
     client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
     if (client_sock < 0) {
-        printf("accept failed\n");
+        printf("accept failed!!!!!!!\n");
         write_to_log("Connection accept failed\n");
         exit(EXIT_FAILURE);
     }
@@ -227,10 +246,12 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	sa2.sa_flags     = SA_SIGINFO;
 	sigemptyset (&sa2.sa_mask);
 	sigaction (SIGUSR1, &sa2, NULL);
-    
 
     while((*(child_process_table+node_n)).connected_flag) {
-    	if(!(*(child_process_table+node_n)).message_received_flag) {
+    	if((*(child_process_table+node_n)).message_received_flag == 0) {
+    		char msg[DATA_SIZE];
+    		sprintf(msg, "child-process continue, nid: %d\n", node_n);
+    		write_to_log(msg);
     		continue;
     	}
 
@@ -256,7 +277,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			continue;
 		}
 
-		(*(child_process_table+node_n)).message_received_flag = 0;
+		(*(child_process_table+node_n)).message_received_flag--;
 	}/* end while */
 
 	close(client_sock);

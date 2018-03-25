@@ -43,6 +43,8 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
         (*argv)[i] = (*argv)[i+4];
     }
     (*argc) -= extra_arguments;
+    sleep(1); // NOTICE: the reason to sleep is to wait child-process to setup the handler
+              // otherwise, the sended message may be too early to trigger the SIGIO
     return 0;
 }
 
@@ -68,11 +70,12 @@ void sm_barrier(void) {
 	char message[DATA_SIZE], server_reply[DATA_SIZE];
 	memset(message, 0, DATA_SIZE);
 	sprintf(message, "sm_barrier");
-	send(sock, message, strlen(message) , 0);
-	//printf("client send message: %s\n", message);
+	int temp = send(sock, message, strlen(message) , 0);
+	printf("client send message: %s, ret value: %d\n", message, temp);
 	memset(server_reply, 0, DATA_SIZE);
-	int temp = recv(sock, server_reply, DATA_SIZE, 0);
+	temp = recv(sock, server_reply, DATA_SIZE, 0);
 	if(strcmp(server_reply, message)!=0){
+        printf("server_reply: %s\n", server_reply);
 		printf("sm_barrier error\n");
 		exit(0);
 	}
