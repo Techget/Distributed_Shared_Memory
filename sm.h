@@ -57,6 +57,6 @@ void sm_barrier (void);
  * - `addr' may not refer to shared memory.
  */
 void sm_bcast (void **addr, int root_nid);
-
+void sm_test_handler(void);
 
 #endif /* !_SM_H  */

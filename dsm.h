@@ -28,11 +28,6 @@ typedef struct Shared{
 	Semaphore *mutex;
 }Shared;
 
-// struct remote_node {
-// 	int barrier_blocked;
-// 	int client_sock;
-// };
-
 struct child_process {
 	int barrier_blocked;
 	int client_sock;

@@ -50,6 +50,12 @@ void sm_node_exit(void) {
 	close(sock);
 }
 
+void sm_test_handler(void) {
+    char message[DATA_SIZE], server_reply[DATA_SIZE];
+    int temp = recv(sock, server_reply, DATA_SIZE, 0);
+    printf("remote-node receive message: %s\n", server_reply);
+}
+
 
 /*
 */

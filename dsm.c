@@ -60,8 +60,25 @@ void cleanUp(int n_processes) {
 	munmap(child_process_table, n_processes * sizeof(struct child_process));
 }
 
-void child_process_SIGIO_handler (int signum)
-{
+void child_process_SIGUSR1_handler(int signum, siginfo_t *si, void *ctx) {
+	int pid = getpid(); // use pid to get nid
+	int nid = 0;
+	for (nid=0; nid<(*shared).n_processes; nid++) {
+		if ((*(child_process_table+nid)).pid == pid) break;
+	}
+
+	memcpy((*(child_process_table+nid)).client_message, "hello world", 12);
+	send((*(child_process_table+nid)).client_sock,(*(child_process_table+nid)).client_message, 	
+		strlen((*(child_process_table+nid)).client_message),0);
+}
+
+void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
+	// printf("signum: %d, SIGIO: %d\n", signum, SIGIO);
+	// printf("inside child_process_SIGIO_handler, siginfo_t si_code: %d, POLL_IN: %d, POLL_OUT: %d, POLL_HUP: %d\n", 
+	// 	si->si_code, POLL_IN, POLL_OUT, POLL_HUP);
+	// NOTICE, the si_code always equal to 128, cannot use that to distinguish
+	// POLL_IN & POLL_OUT, however, seems only receive will enter this snippet
+
 	int pid = getpid(); // use pid to get nid
 	int nid = 0;
 	for (nid=0; nid<(*shared).n_processes; nid++) {
@@ -76,6 +93,7 @@ void child_process_SIGIO_handler (int signum)
 	memset((*(child_process_table+nid)).client_message, 0,DATA_SIZE );
 	int num = recv((*(child_process_table+nid)).client_sock,
 		(*(child_process_table+nid)).client_message, DATA_SIZE, 0);
+	printf("num: %d\n", num);
 	if (num == -1) {
         perror("recv");
         exit(1);
@@ -186,14 +204,31 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     (*(child_process_table+node_n)).connected_flag = 1;
     (*(child_process_table+node_n)).message_received_flag = 0;
     // char client_message[DATA_SIZE];
-    fcntl (client_sock, F_SETFL, O_ASYNC);
-	fcntl (client_sock, F_SETOWN, getpid ());
-	struct sigaction sa;
-	sa.sa_handler = child_process_SIGIO_handler;
-	sa.sa_flags   = 0;
-	sigemptyset (&sa.sa_mask);
-	sigaction (SIGPOLL, &sa, NULL);
- 
+ //    fcntl (client_sock, F_SETFL, O_ASYNC);
+	// fcntl (client_sock, F_SETOWN, getpid ());
+	// struct sigaction sa;
+	// sa.sa_handler = child_process_SIGIO_handler;
+	// sa.sa_flags   = 0;
+	// sigemptyset (&sa.sa_mask);
+	// sigaction (SIGPOLL, &sa, NULL);
+
+    fcntl( client_sock, F_SETOWN, getpid() );
+    // fcntl( client_sock, F_SETSIG, SIGIO );
+    fcntl( client_sock, F_SETFL, O_ASYNC );
+    struct sigaction sa;
+    memset( &sa, 0, sizeof(struct sigaction) );
+    sigemptyset( &sa.sa_mask );
+    sa.sa_sigaction = child_process_SIGIO_handler;
+    sa.sa_flags = SA_SIGINFO;
+    sigaction( SIGIO, &sa, NULL );
+
+    struct sigaction sa2;
+	sa2.sa_sigaction = child_process_SIGUSR1_handler;
+	sa2.sa_flags     = SA_SIGINFO;
+	sigemptyset (&sa2.sa_mask);
+	sigaction (SIGUSR1, &sa2, NULL);
+    
+
     while((*(child_process_table+node_n)).connected_flag) {
     	if(!(*(child_process_table+node_n)).message_received_flag) {
     		continue;
