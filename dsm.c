@@ -17,26 +17,12 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <fcntl.h>
 
 #include "dsm.h"
 
-// #define DEBUG
-#ifdef DEBUG
-# define debug_printf(...) printf( __VA_ARGS__ );
-#else
-# define debug_printf(...) do {} while(0)
-#endif
-
-#define DATA_SIZE 1024
-#define PORT_BASE 10000
-#define HOST_NAME_LENTH 128
-#define OPTION_LENTH 128
-#define COMMAND_LENTH 256
-#define LOCALHOST "localhost"
-
 static struct Shared* shared;
-static int* pids;
-static struct remote_node * remote_node_table;
+static struct child_process * child_process_table;
 static FILE * log_file_fp;
 
 /*********************** Semaphore *******************************/
@@ -71,7 +57,37 @@ void cleanUp(int n_processes) {
 	}
 	sem_destroy(shared->mutex);
 	munmap(shared, sizeof(struct Shared));
-	munmap(pids, sizeof(int)*n_processes);
+	munmap(child_process_table, n_processes * sizeof(struct child_process));
+}
+
+void child_process_SIGIO_handler (int signum)
+{
+	int pid = getpid(); // use pid to get nid
+	int nid = 0;
+	for (nid=0; nid<(*shared).n_processes; nid++) {
+		if ((*(child_process_table+nid)).pid == pid) break;
+	}
+
+	if (nid >= (*shared).n_processes) {
+		debug_printf("cannot find the nid\n");
+		exit(1);
+	}
+
+	memset((*(child_process_table+nid)).client_message, 0,DATA_SIZE );
+	int num = recv((*(child_process_table+nid)).client_sock,
+		(*(child_process_table+nid)).client_message, DATA_SIZE, 0);
+	if (num == -1) {
+        perror("recv");
+        exit(1);
+	} else if (num == 0) {
+		(*(child_process_table+nid)).connected_flag = 0;
+		debug_printf("child process: %d, connection closed\n");
+		return;
+	}
+
+	(*(child_process_table+nid)).message_received_flag = 1;
+	debug_printf("child-process %d, msg Received %s\n", nid,
+		(*(child_process_table+nid)).client_message);
 }
 
 
@@ -166,39 +182,46 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
         exit(EXIT_FAILURE);
     }
 
-    char client_message[DATA_SIZE];
+    (*(child_process_table+node_n)).client_sock = client_sock;
+    (*(child_process_table+node_n)).connected_flag = 1;
+    (*(child_process_table+node_n)).message_received_flag = 0;
+    // char client_message[DATA_SIZE];
+    fcntl (client_sock, F_SETFL, O_ASYNC);
+	fcntl (client_sock, F_SETOWN, getpid ());
+	struct sigaction sa;
+	sa.sa_handler = child_process_SIGIO_handler;
+	sa.sa_flags   = 0;
+	sigemptyset (&sa.sa_mask);
+	sigaction (SIGPOLL, &sa, NULL);
+ 
+    while((*(child_process_table+node_n)).connected_flag) {
+    	if(!(*(child_process_table+node_n)).message_received_flag) {
+    		continue;
+    	}
 
-    while(1) {
-		memset(client_message, 0,DATA_SIZE );
-		int num = recv(client_sock, client_message, DATA_SIZE, 0);
-		if (num == -1) {
-	        perror("recv");
-	        exit(1);
-		} else if (num == 0) {
-	        debug_printf("child-process %d Connection closed\n", node_n);
-	        break;
-		}
-		debug_printf("child-process %d, msg Received %s\n", node_n, client_message);
-		
-		if(strcmp(client_message, "sm_barrier")==0){
+		if(strcmp((*(child_process_table+node_n)).client_message, "sm_barrier")==0){
 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
-			(*(remote_node_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
+			(*(child_process_table+node_n)).barrier_blocked = 1; // the order is important for these two statement
 			((*shared).barrier_counter)++;
 			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
 			
-			while((*(remote_node_table+node_n)).barrier_blocked) {
+			while((*(child_process_table+node_n)).barrier_blocked) {
 				sleep(0);
 			}
 
 			debug_printf("child-process %d, after wait\n",node_n);
-			send(client_sock,client_message, strlen(client_message),0);
+			send(client_sock,(*(child_process_table+node_n)).client_message, 
+				strlen((*(child_process_table+node_n)).client_message),0);
 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
-			node_n, client_message, strlen(client_message));
-		}else if(strcmp(client_message, "sm_malloc")==0){
+				node_n, (*(child_process_table+node_n)).client_message, 
+				strlen((*(child_process_table+node_n)).client_message));
+		}else if(strcmp((*(child_process_table+node_n)).client_message, "sm_malloc")==0){
 			continue;
-		}else if(strcmp(client_message, "sm_bcast")==0){
+		}else if(strcmp((*(child_process_table+node_n)).client_message, "sm_bcast")==0){
 			continue;
 		}
+
+		(*(child_process_table+node_n)).message_received_flag = 0;
 	}/* end while */
 
 	close(client_sock);
@@ -206,7 +229,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
     debug_printf("child-process %d exit\n", node_n);
     while(wait(NULL)>0) {}
-    exit(0);
 }
 
 
@@ -291,12 +313,10 @@ int main(int argc , char *argv[]) {
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	(*shared).barrier_counter = 0;
 	(*shared).online_counter = n_processes;
+	(*shared).n_processes = n_processes;
 	(*shared).mutex = make_semaphore(1);
-	
-	pids = (int *)mmap(NULL, sizeof(int)* n_processes, 
-	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
-	remote_node_table = (struct remote_node *)mmap(NULL, sizeof(struct remote_node)*n_processes, 
+	child_process_table = (struct child_process *)mmap(NULL, sizeof(struct child_process)*n_processes, 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 	/************************* fork child processes *******************/
@@ -329,8 +349,9 @@ int main(int argc , char *argv[]) {
 	        	clnt_program_options, n_clnt_program_option);
 	        exit(0);
 	    } else {
-	   		*(pids + i) = pid;
-	   		(*(remote_node_table + i)).barrier_blocked = 0;
+	   		(*(child_process_table + i)).pid = pid;
+	   		(*(child_process_table + i)).barrier_blocked = 0;
+	   		memset((*(child_process_table + i)).client_message, 0,DATA_SIZE );
 	    }
 	}
 	if (fp != NULL) {
@@ -344,14 +365,15 @@ int main(int argc , char *argv[]) {
 			(*shared).barrier_counter = 0;
 			int i;
 			for(i=0; i<n_processes; i++) {
-				(*(remote_node_table + i)).barrier_blocked = 0;
+				(*(child_process_table + i)).barrier_blocked = 0;
 			}
 		}
 	}
 
 	/******************* clean up resources and exit *******************/
+	while(wait(NULL)>0) {}
 	cleanUp(n_processes);
-	debug_printf("Exiting allocator\n");
+	printf("Exiting allocator\n");
 	return 0;
 }
 
