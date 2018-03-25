@@ -24,8 +24,7 @@ static int node_id=-1;
 static char message[DATA_SIZE];
 static int message_set_flag = 0;
 
-void sigio_handler (int signum, siginfo_t *si, void *ctx)
-{
+void sigio_handler (int signum, siginfo_t *si, void *ctx){
     char message_recv[DATA_SIZE];
     memset(message_recv, 0, DATA_SIZE);
     memset(message, 0, DATA_SIZE);
