@@ -11,7 +11,7 @@
 #include "sm.h"
 #include "sm_mem.h"
 
-//#define DEBUG
+#define DEBUG
 #include "sm_util.h"
 
 #define DATA_SIZE 1024
@@ -19,21 +19,30 @@
 static int sock = -1;
 static int node_id=-1;
 
+
+
+static char message[DATA_SIZE];
+static int message_set_flag = 0;
+
 void sigio_handler (int signum, siginfo_t *si, void *ctx)
 {
-    char server_reply[DATA_SIZE];
-    memset(server_reply, 0, DATA_SIZE);
+    char message_recv[DATA_SIZE];
+    memset(message_recv, 0, DATA_SIZE);
+    memset(message, 0, DATA_SIZE);
+    if (SIGIO != signum) {
+        printf ("Panic!");
+        exit (1);
+    }
 
-  if (SIGIO != signum) {
-    printf ("Panic!");
-    exit (1);
-  }
-  printf ("Caught a SIGIO..............................\n");
-    //int temp = recv(sock, server_reply, DATA_SIZE, 0);
+    int temp = recv(sock, message_recv, DATA_SIZE, 0);
 
-    //printf ("Message: %s\n", server_reply);
+    printf ("Caught a SIGIO.................Message: %s\n", message_recv);
+    if(strcmp(message_recv, "EXCEPTION")!=0){
+        strcpy(message, message_recv);
+        message_set_flag = 1;
+        debug_printf("set message_set_flag =1\n");
+    }
 
-    return;
 }
 
 
@@ -120,7 +129,8 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
     node_id = *nid;
 
     signaction_segv_init();
-    //signaction_sigio_init();
+
+    signaction_sigio_init();
 
     create_mmap(*nid);
 
@@ -142,14 +152,19 @@ void sm_barrier(void) {
         return;
     }
 
-    char message[DATA_SIZE], server_reply[DATA_SIZE];
-    memset(message, 0, DATA_SIZE);
-    sprintf(message, "sm_barrier");
-    send(sock, message, strlen(message) , 0);
+    char message_send[DATA_SIZE], message_recv[DATA_SIZE];
+    memset(message_send, 0, DATA_SIZE);
+    sprintf(message_send, "sm_barrier");
+    send(sock, message_send, strlen(message_send) , 0);
     //printf("client send message: %s\n", message);
-    memset(server_reply, 0, DATA_SIZE);
-    int temp = recv(sock, server_reply, DATA_SIZE, 0);
-    if(strcmp(server_reply, message)!=0){
+
+    while(!message_set_flag){
+        sleep(0);
+    }
+    message_set_flag = 0;
+    //memset(message_recv, 0, DATA_SIZE);
+    //int temp = recv(sock, message_recv, DATA_SIZE, 0);
+    if(strcmp(message, message_send)!=0){
         printf("sm_barrier error\n");
         exit(0);
     }
@@ -167,15 +182,19 @@ void *sm_malloc (size_t size){
     }
     char* alloc;
 
-    char message[DATA_SIZE], server_reply[DATA_SIZE];
-    memset(message, 0, DATA_SIZE);
-    sprintf(message, "sm_malloc%d", size);
-    send(sock, message, strlen(message) , 0);
+    char message_send[DATA_SIZE], message_recv[DATA_SIZE];
+    memset(message_send, 0, DATA_SIZE);
+    sprintf(message_send, "sm_malloc%d", size);
+    send(sock, message_send, strlen(message_send) , 0);
 
-    memset(server_reply, 0, DATA_SIZE);
-    int temp = recv(sock, server_reply, DATA_SIZE, 0);
-    
-    alloc = (char*)strtol(server_reply, NULL, 10);
+    //memset(message_recv, 0, DATA_SIZE);
+    //int temp = recv(sock, message_recv, DATA_SIZE, 0);
+    while(!message_set_flag){
+        sleep(0);
+    }
+    message_set_flag = 0;
+
+    alloc = (char*)strtol(message, NULL, 10);
 
     return alloc;
 }
@@ -194,22 +213,27 @@ void sm_bcast (void **addr, int root_nid){
         return;
     }
     int address;
-    char message[DATA_SIZE], server_reply[DATA_SIZE];
-    memset(message, 0, DATA_SIZE);
+    char message_send[DATA_SIZE], message_recv[DATA_SIZE];
+    memset(message_send, 0, DATA_SIZE);
 
     if(root_nid == node_id){
-        sprintf(message, "sm_bcast%d", *addr);
-        send(sock, message, strlen(message) , 0);
+        sprintf(message_send, "sm_bcast%d", *addr);
+        send(sock, message_send, strlen(message_send) , 0);
         debug_printf("node %d: send sm_bcast with addr: %p\n", node_id, *addr);
     }else{
-        sprintf(message, "sm_bcast%d", 0);
-        send(sock, message, strlen(message) , 0);
+        sprintf(message_send, "sm_bcast%d", 0);
+        send(sock, message_send, strlen(message_send) , 0);
         debug_printf("node %d: send sm_bcast with addr: 0\n", node_id);
     }
-    memset(server_reply, 0, DATA_SIZE);
-    int temp = recv(sock, server_reply, DATA_SIZE, 0);
+    //memset(message_recv, 0, DATA_SIZE);
+    //int temp = recv(sock, message_recv, DATA_SIZE, 0);
     
-    address = (int)strtol(server_reply, NULL, 10);
+    while(!message_set_flag){
+        sleep(0);
+    }
+    message_set_flag = 0;
+
+    address = (int)strtol(message, NULL, 10);
     debug_printf("node %d: receive sm_bcast addr: %p\n", node_id, address);
 
     if(root_nid != node_id){
