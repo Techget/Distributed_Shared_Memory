@@ -47,8 +47,7 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx){
 }
 
 
-void segv_handler (int signum, siginfo_t *si, void *ctx)
-{
+void segv_handler (int signum, siginfo_t *si, void *ctx){
   void *addr;
 
   if (SIGSEGV != signum) {
