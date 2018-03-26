@@ -20,7 +20,7 @@ void* create_mmap(int pid){
   if(pid = -1){ // allow full access in allocator
     prot = PROT_READ | PROT_WRITE;
   }else{        // no w/r access in client
-    prot = 0;
+    prot = PROT_NONE;
   }
 
   alloc = mmap(address, bytes,prot ,
