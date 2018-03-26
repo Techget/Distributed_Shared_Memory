@@ -200,14 +200,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     (*(child_process_table+node_n)).client_sock = client_sock;
     (*(child_process_table+node_n)).connected_flag = 1;
     (*(child_process_table+node_n)).message_received_flag = 0;
-    // char client_message[DATA_SIZE];
-	// fcntl (client_sock, F_SETFL, O_ASYNC);
-	// fcntl (client_sock, F_SETOWN, getpid ());
-	// struct sigaction sa;
-	// sa.sa_handler = child_process_SIGIO_handler;
-	// sa.sa_flags   = 0;
-	// sigemptyset (&sa.sa_mask);
-	// sigaction (SIGPOLL, &sa, NULL);
+
 
     fcntl( client_sock, F_SETOWN, getpid() );
     // fcntl( client_sock, F_SETSIG, SIGIO );
@@ -249,9 +242,45 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
 				node_n, (*(child_process_table+node_n)).client_message, 
 				strlen((*(child_process_table+node_n)).client_message));
-		}else if(strcmp((*(child_process_table+node_n)).client_message, "sm_malloc")==0){
+		}else if(strncmp((*(child_process_table+node_n)).client_message, "sm_malloc", 9)==0){
+ 			long alloc_size = get_number((*(child_process_table+node_n)).client_message);
+ 			debug_printf("child-process %d, start process sm_malloc (%d)\n", node_n, alloc_size);
+
+ 			memset((*(child_process_table+node_n)).client_message, 0, DATA_SIZE);
+			sprintf((*(child_process_table+node_n)).client_message, "%d", shared_mem->pointer);
+ 			send(client_sock,(*(child_process_table+node_n)).client_message, strlen((*(child_process_table+node_n)).client_message),0);
+			debug_printf("child-process %d, msg being sent: %s, addr: 0x%x,  Number of bytes sent: %zu\n",
+ 					node_n, (*(child_process_table+node_n)).client_message, shared_mem->pointer, strlen((*(child_process_table+node_n)).client_message));
+
+
+
+		}else if(strncmp((*(child_process_table+node_n)).client_message, "sm_bcast", 8)==0){
+ 			int address = get_number((*(child_process_table+node_n)).client_message);
+ 			debug_printf("child-process %d, start process sm_bcast (%x)\n", node_n, address);
+			if(address!=0){
+ 				shared_mem->bcast_addr = address;
+ 			}
+
+ 			// barrier in sm_bcast
+ 			(*(child_process_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
+			((*shared).barrier_counter)++;
+ 			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
+			
+ 			while((*(child_process_table+node_n)).barrier_blocked) {
+ 				sleep(0);
+ 			}
+
+			debug_printf("child-process %d, after wait\n",node_n);
+			memset((*(child_process_table+node_n)).client_message, 0, DATA_SIZE);
+ 			sprintf((*(child_process_table+node_n)).client_message, "%d", shared_mem->bcast_addr);
+ 			send(client_sock,(*(child_process_table+node_n)).client_message, strlen((*(child_process_table+node_n)).client_message),0);
+ 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
+ 			node_n, (*(child_process_table+node_n)).client_message, strlen((*(child_process_table+node_n)).client_message));
+		}else if(strncmp((*(child_process_table+node_n)).client_message, "read_fault", 10)==0){
 			continue;
-		}else if(strcmp((*(child_process_table+node_n)).client_message, "sm_bcast")==0){
+
+		}else if(strncmp((*(child_process_table+node_n)).client_message, "write_fault", 11)==0){
+
 			continue;
 		}
 
@@ -266,73 +295,8 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 }
 
 
-//     while(1) {
-// 		memset(client_message, 0,DATA_SIZE );
-// 		int num = recv(client_sock, client_message, DATA_SIZE, 0);
-// 		if (num == -1) {
-// 	        perror("recv");
-// 	        exit(1);
-// 		} else if (num == 0) {
-// 	        debug_printf("child-process %d Connection closed\n", node_n);
-// 	        break;
-// 		}
-// 		debug_printf("child-process %d, msg Received %s\n", node_n, client_message);
-		
-// 		if(strcmp(client_message, "sm_barrier")==0){
-// 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
-// 			(*(remote_node_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
-// 			((*shared).barrier_counter)++;
-// 			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
-			
-// 			while((*(remote_node_table+node_n)).barrier_blocked) {
-// 				sleep(0);
-// 			}
-
-// 			debug_printf("child-process %d, after wait\n",node_n);
-// 			send(client_sock,client_message, strlen(client_message),0);
-// 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
-// 			node_n, client_message, strlen(client_message));
-// 		}else if(strncmp(client_message, "sm_malloc", 9)==0){
-// 			long alloc_size = get_number(client_message);
-// 			debug_printf("child-process %d, start process sm_malloc (%d)\n", node_n, alloc_size);
-
-// 			memset(client_message, 0, DATA_SIZE);
-// 			sprintf(client_message, "%d", shared_mem->pointer);
-// 			send(client_sock,client_message, strlen(client_message),0);
-// 			debug_printf("child-process %d, msg being sent: %s, addr: 0x%x,  Number of bytes sent: %zu\n",
-// 					node_n, client_message, shared_mem->pointer, strlen(client_message));
-
-// 		}else if(strncmp(client_message, "sm_bcast", 8)==0){
-// 			int address = get_number(client_message);
-// 			debug_printf("child-process %d, start process sm_bcast (%x)\n", node_n, address);
-// 			if(address!=0){
-// 				shared_mem->bcast_addr = address;
-// 			}
-
-// 			// barrier in sm_bcast
-// 			(*(remote_node_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
-// 			((*shared).barrier_counter)++;
-// 			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
-			
-// 			while((*(remote_node_table+node_n)).barrier_blocked) {
-// 				sleep(0);
-// 			}
-
-// 			debug_printf("child-process %d, after wait\n",node_n);
-// 			memset(client_message, 0, DATA_SIZE);
-// 			sprintf(client_message, "%d", shared_mem->bcast_addr);
-// 			send(client_sock,client_message, strlen(client_message),0);
-// 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
-// 			node_n, client_message, strlen(client_message));
 
 
-// 		}else if(strncmp(client_message, "read_fault", 8)==0){
-// 			continue;
-
-// 		}else if(strncmp(client_message, "write_fault", 8)==0){
-
-// 			continue;
-// 		}
 // 	}/* end while */
 
 /*
