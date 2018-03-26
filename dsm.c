@@ -22,11 +22,8 @@
 #include "dsm.h"
 #include "sm_mem.h"
 
-
-
 #define DEBUG  // define DEBUG before sm_util.h
 #include "sm_util.h"
-
 
 #define PORT_BASE 10000
 #define HOST_NAME_LENTH 128
@@ -38,9 +35,6 @@ static struct Shared* shared;
 static struct Shared_Mem* shared_mem;
 static struct child_process * child_process_table;
 static FILE * log_file_fp;
-
-static char message[DATA_SIZE];
-static int message_set_flag = 0;
 
 
 
@@ -252,8 +246,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			debug_printf("child-process %d, msg being sent: %s, addr: 0x%x,  Number of bytes sent: %zu\n",
  					node_n, (*(child_process_table+node_n)).client_message, shared_mem->pointer, strlen((*(child_process_table+node_n)).client_message));
 
-
-
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "sm_bcast", 8)==0){
  			int address = get_number((*(child_process_table+node_n)).client_message);
  			debug_printf("child-process %d, start process sm_bcast (%x)\n", node_n, address);
@@ -296,8 +288,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
 
 
-
-// 	}/* end while */
 
 /*
 * 	Connection model basically as following:
