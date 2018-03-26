@@ -43,7 +43,7 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
         (*argv)[i] = (*argv)[i+4];
     }
     (*argc) -= extra_arguments;
-    sleep(1); // NOTICE: the reason to sleep is to wait child-process to setup the handler
+    usleep(500000); // NOTICE: the reason to sleep is to wait child-process to setup the handler
               // otherwise, the sended message may be too early to trigger the SIGIO
     return 0;
 }
