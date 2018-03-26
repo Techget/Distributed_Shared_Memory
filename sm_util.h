@@ -8,7 +8,7 @@
 /**
 *	Common functions used in dsm and sm are defined in sm_util.h
 */
-#define DATA_SIZE 1024
+#define DATA_SIZE 4096
 
 
 

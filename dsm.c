@@ -36,12 +36,58 @@
 
 static struct Shared* shared;
 static struct Shared_Mem* shared_mem;
-static struct remote_node * remote_node_table;
+static struct child_process * child_process_table;
 static FILE * log_file_fp;
 
 static char message[DATA_SIZE];
 static int message_set_flag = 0;
 
+
+
+void child_process_SIGUSR1_handler(int signum, siginfo_t *si, void *ctx) {
+	int pid = getpid(); // use pid to get nid
+	int nid = 0;
+	for (nid=0; nid<(*shared).n_processes; nid++) {
+		if ((*(child_process_table+nid)).pid == pid) break;
+	}
+
+	memcpy((*(child_process_table+nid)).client_message, "hello world", 12);
+	send((*(child_process_table+nid)).client_sock,(*(child_process_table+nid)).client_message, 	
+		strlen((*(child_process_table+nid)).client_message),0);
+}
+
+void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
+	int pid = getpid(); // use pid to get nid
+	int nid = 0;
+	for (nid=0; nid<(*shared).n_processes; nid++) {
+		if ((*(child_process_table+nid)).pid == pid) break;
+	}
+
+	if (nid >= (*shared).n_processes) {
+		debug_printf("cannot find the nid\n");
+		exit(1);
+	}
+	printf("inside child_process_SIGIO_handler nid: %d, siginfo_t si_code: %d, si_band: %d, si_fd: %d, POLL_IN: %d, POLL_OUT: %d, POLL_HUP: %d\n", 
+		nid, si->si_code, si->si_band, si->si_fd, POLL_IN, POLL_OUT, POLL_HUP);
+
+	memset((*(child_process_table+nid)).client_message, 0,DATA_SIZE );
+	int num = recv((*(child_process_table+nid)).client_sock,
+		(*(child_process_table+nid)).client_message, DATA_SIZE, 0);
+	// printf("num: %d\n", num);
+	if (num == -1) {
+        perror("recv");
+        exit(1);
+	} else if (num == 0) {
+		(*(child_process_table+nid)).connected_flag = 0;
+		debug_printf("child process: %d, connection closed\n", nid);
+		return;
+	}
+
+	(*(child_process_table+nid)).message_received_flag++;
+	debug_printf("child-process %d, msg Received %s\n", nid,
+		(*(child_process_table+nid)).client_message); 
+	
+}
 
 void write_to_log(const char * s) {
 	if (log_file_fp != NULL) {
@@ -101,7 +147,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		port++;
 		server.sin_port = htons(port);	
     }
-    listen(socket_desc , 3);
+    listen(socket_desc , 1);
 
     /* prepare the args to execute program on remote node/local machine*/
     // extra args are: [./func name] [ip] [port] [n_processes] [nid] [options(doesnot counter)] [NULL]
@@ -146,85 +192,70 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	int c = sizeof(struct sockaddr_in); 
     client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
     if (client_sock < 0) {
-        printf("accept failed\n");
+        printf("accept failed!!!!!!!\n");
         write_to_log("Connection accept failed\n");
         exit(EXIT_FAILURE);
     }
 
-    /* non block socket*/
-	int flags = fcntl(client_sock, F_GETFL, 0);
-	fcntl(client_sock, F_SETFL, flags | O_NONBLOCK);
+    (*(child_process_table+node_n)).client_sock = client_sock;
+    (*(child_process_table+node_n)).connected_flag = 1;
+    (*(child_process_table+node_n)).message_received_flag = 0;
+    // char client_message[DATA_SIZE];
+	// fcntl (client_sock, F_SETFL, O_ASYNC);
+	// fcntl (client_sock, F_SETOWN, getpid ());
+	// struct sigaction sa;
+	// sa.sa_handler = child_process_SIGIO_handler;
+	// sa.sa_flags   = 0;
+	// sigemptyset (&sa.sa_mask);
+	// sigaction (SIGPOLL, &sa, NULL);
 
+    fcntl( client_sock, F_SETOWN, getpid() );
+    // fcntl( client_sock, F_SETSIG, SIGIO );
+    fcntl( client_sock, F_SETFL, O_ASYNC );
+    struct sigaction sa;
+    memset( &sa, 0, sizeof(struct sigaction) );
+    sigemptyset( &sa.sa_mask );
+    sa.sa_sigaction = child_process_SIGIO_handler;
+    sa.sa_flags = SA_SIGINFO;
+    sigaction( SIGIO, &sa, NULL );
 
-    char client_message[DATA_SIZE];
-	debug_printf("child-process %d", node_n);
-    while(1) {
-		memset(client_message, 0,DATA_SIZE );
-		int num = recv(client_sock, client_message, DATA_SIZE, 0);
-		if (num == -1) {
-	        perror("recv");
-	        exit(1);
-		} else if (num == 0) {
-	        debug_printf("child-process %d Connection closed\n", node_n);
-	        break;
-		}
-		debug_printf("child-process %d, msg Received %s\n", node_n, client_message);
-		
-		if(strcmp(client_message, "sm_barrier")==0){
+    struct sigaction sa2;
+	sa2.sa_sigaction = child_process_SIGUSR1_handler;
+	sa2.sa_flags     = SA_SIGINFO;
+	sigemptyset (&sa2.sa_mask);
+	sigaction (SIGUSR1, &sa2, NULL);
+
+    while((*(child_process_table+node_n)).connected_flag) {
+    	if((*(child_process_table+node_n)).message_received_flag == 0) {
+    		char msg[DATA_SIZE];
+    		sprintf(msg, "child-process continue, nid: %d\n", node_n);
+    		write_to_log(msg);
+    		continue;
+    	}
+
+		if(strcmp((*(child_process_table+node_n)).client_message, "sm_barrier")==0){
 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
-			(*(remote_node_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
+			(*(child_process_table+node_n)).barrier_blocked = 1; // the order is important for these two statement
 			((*shared).barrier_counter)++;
 			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
 			
-			while((*(remote_node_table+node_n)).barrier_blocked) {
+			while((*(child_process_table+node_n)).barrier_blocked) {
 				sleep(0);
 			}
 
 			debug_printf("child-process %d, after wait\n",node_n);
-			send(client_sock,client_message, strlen(client_message),0);
+			send(client_sock,(*(child_process_table+node_n)).client_message, 
+				strlen((*(child_process_table+node_n)).client_message),0);
 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
-			node_n, client_message, strlen(client_message));
-		}else if(strncmp(client_message, "sm_malloc", 9)==0){
-			long alloc_size = get_number(client_message);
-			debug_printf("child-process %d, start process sm_malloc (%d)\n", node_n, alloc_size);
-
-			memset(client_message, 0, DATA_SIZE);
-			sprintf(client_message, "%d", shared_mem->pointer);
-			send(client_sock,client_message, strlen(client_message),0);
-			debug_printf("child-process %d, msg being sent: %s, addr: 0x%x,  Number of bytes sent: %zu\n",
-					node_n, client_message, shared_mem->pointer, strlen(client_message));
-
-		}else if(strncmp(client_message, "sm_bcast", 8)==0){
-			int address = get_number(client_message);
-			debug_printf("child-process %d, start process sm_bcast (%x)\n", node_n, address);
-			if(address!=0){
-				shared_mem->bcast_addr = address;
-			}
-
-			// barrier in sm_bcast
-			(*(remote_node_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
-			((*shared).barrier_counter)++;
-			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
-			
-			while((*(remote_node_table+node_n)).barrier_blocked) {
-				sleep(0);
-			}
-
-			debug_printf("child-process %d, after wait\n",node_n);
-			memset(client_message, 0, DATA_SIZE);
-			sprintf(client_message, "%d", shared_mem->bcast_addr);
-			send(client_sock,client_message, strlen(client_message),0);
-			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
-			node_n, client_message, strlen(client_message));
-
-
-		}else if(strncmp(client_message, "read_fault", 8)==0){
+				node_n, (*(child_process_table+node_n)).client_message, 
+				strlen((*(child_process_table+node_n)).client_message));
+		}else if(strcmp((*(child_process_table+node_n)).client_message, "sm_malloc")==0){
 			continue;
-
-		}else if(strncmp(client_message, "write_fault", 8)==0){
-
+		}else if(strcmp((*(child_process_table+node_n)).client_message, "sm_bcast")==0){
 			continue;
 		}
+
+		(*(child_process_table+node_n)).message_received_flag--;
 	}/* end while */
 
 	close(client_sock);
@@ -232,9 +263,77 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
     debug_printf("child-process %d exit\n", node_n);
     while(wait(NULL)>0) {}
-    exit(0);
 }
 
+
+//     while(1) {
+// 		memset(client_message, 0,DATA_SIZE );
+// 		int num = recv(client_sock, client_message, DATA_SIZE, 0);
+// 		if (num == -1) {
+// 	        perror("recv");
+// 	        exit(1);
+// 		} else if (num == 0) {
+// 	        debug_printf("child-process %d Connection closed\n", node_n);
+// 	        break;
+// 		}
+// 		debug_printf("child-process %d, msg Received %s\n", node_n, client_message);
+		
+// 		if(strcmp(client_message, "sm_barrier")==0){
+// 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
+// 			(*(remote_node_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
+// 			((*shared).barrier_counter)++;
+// 			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
+			
+// 			while((*(remote_node_table+node_n)).barrier_blocked) {
+// 				sleep(0);
+// 			}
+
+// 			debug_printf("child-process %d, after wait\n",node_n);
+// 			send(client_sock,client_message, strlen(client_message),0);
+// 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
+// 			node_n, client_message, strlen(client_message));
+// 		}else if(strncmp(client_message, "sm_malloc", 9)==0){
+// 			long alloc_size = get_number(client_message);
+// 			debug_printf("child-process %d, start process sm_malloc (%d)\n", node_n, alloc_size);
+
+// 			memset(client_message, 0, DATA_SIZE);
+// 			sprintf(client_message, "%d", shared_mem->pointer);
+// 			send(client_sock,client_message, strlen(client_message),0);
+// 			debug_printf("child-process %d, msg being sent: %s, addr: 0x%x,  Number of bytes sent: %zu\n",
+// 					node_n, client_message, shared_mem->pointer, strlen(client_message));
+
+// 		}else if(strncmp(client_message, "sm_bcast", 8)==0){
+// 			int address = get_number(client_message);
+// 			debug_printf("child-process %d, start process sm_bcast (%x)\n", node_n, address);
+// 			if(address!=0){
+// 				shared_mem->bcast_addr = address;
+// 			}
+
+// 			// barrier in sm_bcast
+// 			(*(remote_node_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
+// 			((*shared).barrier_counter)++;
+// 			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
+			
+// 			while((*(remote_node_table+node_n)).barrier_blocked) {
+// 				sleep(0);
+// 			}
+
+// 			debug_printf("child-process %d, after wait\n",node_n);
+// 			memset(client_message, 0, DATA_SIZE);
+// 			sprintf(client_message, "%d", shared_mem->bcast_addr);
+// 			send(client_sock,client_message, strlen(client_message),0);
+// 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
+// 			node_n, client_message, strlen(client_message));
+
+
+// 		}else if(strncmp(client_message, "read_fault", 8)==0){
+// 			continue;
+
+// 		}else if(strncmp(client_message, "write_fault", 8)==0){
+
+// 			continue;
+// 		}
+// 	}/* end while */
 
 /*
 * 	Connection model basically as following:
@@ -317,8 +416,9 @@ int main(int argc , char *argv[]) {
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	(*shared).barrier_counter = 0;
 	(*shared).online_counter = n_processes;
+	(*shared).n_processes = n_processes;
 	
-	remote_node_table = (struct remote_node *)mmap(NULL, sizeof(struct remote_node)*n_processes, 
+	child_process_table = (struct child_process *)mmap(NULL, sizeof(struct child_process)*n_processes, 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 
@@ -363,7 +463,9 @@ int main(int argc , char *argv[]) {
 	        	clnt_program_options, n_clnt_program_option);
 	        exit(0);
 	    } else {
-	   		(*(remote_node_table + i)).barrier_blocked = 0;
+   			(*(child_process_table + i)).pid = pid;
+	   		(*(child_process_table + i)).barrier_blocked = 0;
+			memset((*(child_process_table + i)).client_message, 0,DATA_SIZE );
 	    }
 	}
 	if (fp != NULL) {
@@ -377,14 +479,15 @@ int main(int argc , char *argv[]) {
 			(*shared).barrier_counter = 0;
 			int i;
 			for(i=0; i<n_processes; i++) {
-				(*(remote_node_table + i)).barrier_blocked = 0;
+				(*(child_process_table + i)).barrier_blocked = 0;
 			}
 		}
 	}
 
 	/******************* clean up resources and exit *******************/
+	while(wait(NULL)>0) {}
 	cleanUp(n_processes);
-	debug_printf("Exiting allocator\n");
+	printf("Exiting allocator\n");
 	return 0;
 }
 

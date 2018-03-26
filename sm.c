@@ -14,7 +14,7 @@
 #define DEBUG
 #include "sm_util.h"
 
-#define DATA_SIZE 1024
+
 
 static int sock = -1;
 static int node_id=-1;
@@ -133,6 +133,9 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
     signaction_sigio_init();
 
     create_mmap(*nid);
+
+    usleep(500000);// NOTICE: the reason to sleep is to wait child-process to setup the handler
+        // otherwise, the sended message may be too early to trigger the SIGIO
 
     return 0;
 }

@@ -1,12 +1,14 @@
 #ifndef	_DSM_H
 #define	_DSM_H
 
+#define DATA_SIZE 4096
 /**
 *	Data structure to record remote node in allocator
 */
 typedef struct Shared{
 	int barrier_counter;
 	int online_counter;
+	int n_processes;
 }Shared;
 
 
@@ -18,10 +20,14 @@ typedef struct Shared_Mem{
 
 
 
-struct remote_node {
+struct child_process {
 	int barrier_blocked;
+	int client_sock;
+	int pid;
+	char client_message[DATA_SIZE];
+	int connected_flag;
+	int message_received_flag;
 };
-
 /**
 *	print to stdout the helper info.
 */
