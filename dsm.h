@@ -14,7 +14,6 @@ typedef struct Shared{
 
 typedef struct Shared_Mem{
 	int bcast_addr;
-
 	char* pointer;
 }Shared_Mem;
 
