@@ -35,35 +35,35 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx){
 
     int temp = recv(sock, message_recv, DATA_SIZE, 0);
 
-    printf ("Caught a SIGIO.................Message: %s\n", message_recv);
+    printf ("Client %d: Receive socket Message: %s\n", node_id, message_recv);
     if(strcmp(message_recv, "EXCEPTION")==0){
         // process exception
     }else{
         strcpy(message, message_recv);
         message_set_flag = 1;
-        debug_printf("set message_set_flag =1\n");
     }
 
 }
 
 
 void segv_handler (int signum, siginfo_t *si, void *ctx){
-  void *addr;
+    void *addr;
 
-  if (SIGSEGV != signum) {
-    printf ("Panic!");
-    exit (1);
-  }
-  addr = si->si_addr;         /* here we get the fault address */
-
+    if (SIGSEGV != signum) {
+        printf ("Panic!");
+        exit (1);
+    }
+    addr = si->si_addr;         /* here we get the fault address */
+    debug_printf("Cilent %d: Catch a SEGV ...................... at address: %p\n",node_id, addr);
     if (sock == -1) {
         printf("Run sm_node_init first\n");
         return;
     }
 
+
     char message[DATA_SIZE];
     memset(message, 0, DATA_SIZE);
-    sprintf(message, "SEGV=%p", addr);
+    sprintf(message, "read_fault%d", addr);
     send(sock, message, strlen(message) , 0);
 
 
@@ -132,7 +132,7 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
 
     signaction_sigio_init();
 
-    create_mmap(*nid);
+    create_mmap(node_id);
 
     usleep(500000);// NOTICE: the reason to sleep is to wait child-process to setup the handler
         // otherwise, the sended message may be too early to trigger the SIGIO
@@ -198,6 +198,10 @@ void *sm_malloc (size_t size){
     message_set_flag = 0;
 
     alloc = (char*)strtol(message, NULL, 10);
+
+    // grant full access of memory to client who creates it
+    mprotect(alloc, size, PROT_READ | PROT_WRITE); 
+
 
     return alloc;
 }

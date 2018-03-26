@@ -61,8 +61,8 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 		debug_printf("cannot find the nid\n");
 		exit(1);
 	}
-	printf("inside child_process_SIGIO_handler nid: %d, siginfo_t si_code: %d, si_band: %d, si_fd: %d, POLL_IN: %d, POLL_OUT: %d, POLL_HUP: %d\n", 
-		nid, si->si_code, si->si_band, si->si_fd, POLL_IN, POLL_OUT, POLL_HUP);
+	//debug_printf("inside child_process_SIGIO_handler nid: %d, siginfo_t si_code: %d, si_band: %d, si_fd: %d, POLL_IN: %d, POLL_OUT: %d, POLL_HUP: %d\n", 
+	//	nid, si->si_code, si->si_band, si->si_fd, POLL_IN, POLL_OUT, POLL_HUP);
 
 	memset((*(child_process_table+nid)).client_message, 0,DATA_SIZE );
 	int num = recv((*(child_process_table+nid)).client_sock,
@@ -78,8 +78,8 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 	}
 
 	(*(child_process_table+nid)).message_received_flag++;
-	debug_printf("child-process %d, msg Received %s\n", nid,
-		(*(child_process_table+nid)).client_message); 
+	//debug_printf("child-process %d, msg Received %s\n", nid,
+	//	(*(child_process_table+nid)).client_message); 
 	
 }
 
@@ -242,9 +242,14 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
  			memset((*(child_process_table+node_n)).client_message, 0, DATA_SIZE);
 			sprintf((*(child_process_table+node_n)).client_message, "%d", shared_mem->pointer);
+
+			record_mem_info(shared_mem, node_n, alloc_size);
+
  			send(client_sock,(*(child_process_table+node_n)).client_message, strlen((*(child_process_table+node_n)).client_message),0);
 			debug_printf("child-process %d, msg being sent: %s, addr: 0x%x,  Number of bytes sent: %zu\n",
  					node_n, (*(child_process_table+node_n)).client_message, shared_mem->pointer, strlen((*(child_process_table+node_n)).client_message));
+
+ 
 
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "sm_bcast", 8)==0){
  			int address = get_number((*(child_process_table+node_n)).client_message);
@@ -269,11 +274,23 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
  			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
  			node_n, (*(child_process_table+node_n)).client_message, strlen((*(child_process_table+node_n)).client_message));
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "read_fault", 10)==0){
-			continue;
+			int address = get_number((*(child_process_table+node_n)).client_message);
+ 			debug_printf("child-process %d, start process read_fault (%p)\n", node_n, address);
+
+
+			debug_printf("child-process %d, request read_fault access............\n", node_n);
+
+ 			int writer;
+ 			writer = get_writer_nid(shared_mem, address);
+ 			debug_printf("child-process %d, request read_fault access from (%d)\n", node_n, writer);
+
+
 
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "write_fault", 11)==0){
+			int address = get_number((*(child_process_table+node_n)).client_message);
+ 			debug_printf("child-process %d, start process write_fault (%p)\n", node_n, address);
 
-			continue;
+
 		}
 
 		(*(child_process_table+node_n)).message_received_flag--;
@@ -376,15 +393,7 @@ int main(int argc , char *argv[]) {
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 
-	shared_mem = (struct Shared_Mem *)mmap(NULL, sizeof(struct Shared_Mem), 
-	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	(*shared_mem).bcast_addr = 0;
-	(*shared_mem).pointer = NULL;
-
-	shared_mem->pointer = (char *)mmap(NULL, sizeof(char), 
-		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-	shared_mem->pointer = (char*)create_mmap(-1); // -1 indicates parent, test only
+	shared_mem = new_shared_mem(-1); // -1 indicates parent, test only
 
 
 	/************************* fork child processes *******************/
@@ -444,5 +453,6 @@ int main(int argc , char *argv[]) {
 	printf("Exiting allocator\n");
 	return 0;
 }
+
 
 

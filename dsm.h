@@ -1,6 +1,8 @@
 #ifndef	_DSM_H
 #define	_DSM_H
 
+#include "sm_mem.h"
+
 #define DATA_SIZE 4096
 /**
 *	Data structure to record remote node in allocator
@@ -11,11 +13,6 @@ typedef struct Shared{
 	int n_processes;
 }Shared;
 
-
-typedef struct Shared_Mem{
-	int bcast_addr;
-	char* pointer;
-}Shared_Mem;
 
 
 
@@ -42,6 +39,13 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 *	Clean up 
 */
 void cleanUp(int n_processes);
+
+
+
+
+
+
+
 
 
 #endif // _DSM_H
