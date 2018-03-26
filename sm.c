@@ -14,12 +14,8 @@
 #define DEBUG
 #include "sm_util.h"
 
-
-
 static int sock = -1;
 static int node_id=-1;
-
-
 
 static char message[DATA_SIZE];
 static int message_set_flag = 0;
