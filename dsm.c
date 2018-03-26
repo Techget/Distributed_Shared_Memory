@@ -478,7 +478,6 @@ int main(int argc , char *argv[]) {
 
 
 /* Shared Memory operations */
-
 Shared_Mem* new_shared_mem(int nid){
   Shared_Mem* shared_memory;
   shared_memory = (struct Shared_Mem *)mmap(NULL, sizeof(struct Shared_Mem), 
