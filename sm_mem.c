@@ -1,7 +1,7 @@
 #include "sm_mem.h"
 
-#define ADDR_BASE 0xe7500000
-#define PAGE_NUM 0x100
+// #define ADDR_BASE 0xe7500000
+// #define PAGE_NUM 0x10000
 
 
 void* create_mmap(int pid){
@@ -24,7 +24,7 @@ void* create_mmap(int pid){
   }
 
   alloc = mmap(address, bytes,prot ,
-                     MAP_ANON | MAP_SHARED| MAP_FIXED, 0, 0);
+                     MAP_ANONYMOUS|MAP_PRIVATE | MAP_FIXED, 0, 0);
 
   if (alloc == MAP_FAILED) {
     perror("mmap failed.....................................");

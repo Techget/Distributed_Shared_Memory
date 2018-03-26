@@ -94,6 +94,7 @@ void cleanUp(int n_processes) {
 
 	munmap(shared, sizeof(struct Shared));
 	munmap(child_process_table, n_processes * sizeof(struct child_process));
+	munmap(shared_mem->pointer, getpagesize()*PAGE_NUM);
 	munmap(shared_mem, sizeof(struct Shared_Mem));
 }
 
@@ -377,8 +378,8 @@ int main(int argc , char *argv[]) {
 	(*shared_mem).bcast_addr = 0;
 	(*shared_mem).pointer = NULL;
 
-	shared_mem->pointer = (char *)mmap(NULL, sizeof(char), 
-		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	// shared_mem->pointer = (char *)mmap(NULL, sizeof(char), 
+	// 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 	shared_mem->pointer = (char*)create_mmap(-1); // -1 indicates parent, test only
 
