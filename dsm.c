@@ -37,7 +37,6 @@ static struct child_process * child_process_table;
 static FILE * log_file_fp;
 
 
-
 void child_process_SIGUSR1_handler(int signum, siginfo_t *si, void *ctx) {
 	int pid = getpid(); // use pid to get nid
 	int nid = 0;
@@ -58,11 +57,11 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 	}
 
 	if (nid >= (*shared).n_processes) {
-		debug_printf("cannot find the nid\n");
+		printf("cannot find the nid!!! in child_process_SIGIO_handler\n");
 		exit(1);
 	}
-	printf("inside child_process_SIGIO_handler nid: %d, siginfo_t si_code: %d, si_band: %d, si_fd: %d, POLL_IN: %d, POLL_OUT: %d, POLL_HUP: %d\n", 
-		nid, si->si_code, si->si_band, si->si_fd, POLL_IN, POLL_OUT, POLL_HUP);
+	// debug_printf("inside child_process_SIGIO_handler nid: %d, siginfo_t si_code: %d, si_band: %d, si_fd: %d", 
+	// 	nid, si->si_code, si->si_band, si->si_fd);
 
 	memset((*(child_process_table+nid)).client_message, 0,DATA_SIZE );
 	int num = recv((*(child_process_table+nid)).client_sock,
@@ -80,7 +79,6 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 	(*(child_process_table+nid)).message_received_flag++;
 	debug_printf("child-process %d, msg Received %s\n", nid,
 		(*(child_process_table+nid)).client_message); 
-	
 }
 
 void write_to_log(const char * s) {
@@ -89,14 +87,14 @@ void write_to_log(const char * s) {
 	}
 }
 
-
 void cleanUp(int n_processes) {
 	if (log_file_fp != NULL) {
 		fclose(log_file_fp);
 	}
 
 	munmap(shared, sizeof(struct Shared));
-	static struct Shared_Mem* shared_mem;
+	munmap(child_process_table, n_processes * sizeof(struct child_process));
+	munmap(shared_mem, sizeof(struct Shared_Mem));
 }
 
 
@@ -117,7 +115,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 	struct hostent *he;
 	struct in_addr **addr_list;		
 	if ((he = gethostbyname(local_hostname)) == NULL) {
-		// printf("no ip address obtained\n");
+		printf("no ip address obtained !!!\n");
 		write_to_log("no ip address obtained\n");
 		exit(EXIT_FAILURE);
 	}
@@ -194,7 +192,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     (*(child_process_table+node_n)).client_sock = client_sock;
     (*(child_process_table+node_n)).connected_flag = 1;
     (*(child_process_table+node_n)).message_received_flag = 0;
-
 
     fcntl( client_sock, F_SETOWN, getpid() );
     // fcntl( client_sock, F_SETSIG, SIGIO );
@@ -367,17 +364,16 @@ int main(int argc , char *argv[]) {
 
 	/************************* initialize shared memory ******************/
 	shared = (struct Shared *)mmap(NULL, sizeof(struct Shared), 
-	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	(*shared).barrier_counter = 0;
 	(*shared).online_counter = n_processes;
 	(*shared).n_processes = n_processes;
 	
 	child_process_table = (struct child_process *)mmap(NULL, sizeof(struct child_process)*n_processes, 
-	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
+		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 	shared_mem = (struct Shared_Mem *)mmap(NULL, sizeof(struct Shared_Mem), 
-	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	(*shared_mem).bcast_addr = 0;
 	(*shared_mem).pointer = NULL;
 
