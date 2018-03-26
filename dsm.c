@@ -43,8 +43,6 @@ static char message[DATA_SIZE];
 static int message_set_flag = 0;
 
 
-
-
 void write_to_log(const char * s) {
 	if (log_file_fp != NULL) {
 		fprintf(log_file_fp, "%s", s);
