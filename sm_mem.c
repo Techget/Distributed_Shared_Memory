@@ -1,18 +1,14 @@
 #include "sm_mem.h"
 
-// #define ADDR_BASE 0xe7500000
-// #define PAGE_NUM 0x10000
-
-
 void* create_mmap(int pid){
   int i;
-  char *address, *alloc;
+  void *address, *alloc;
   long bytes;
   int prot;
   unsigned char arr[20];
 
-  address = (char*)malloc(sizeof(char));
-  address = (char*)ADDR_BASE;
+  // address = (char*)malloc(sizeof(char));
+  address = (void *)ADDR_BASE;
 
   bytes = getpagesize()*PAGE_NUM;
 

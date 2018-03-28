@@ -11,14 +11,6 @@ typedef struct Shared{
 	int n_processes;
 }Shared;
 
-
-typedef struct Shared_Mem{
-	int bcast_addr;
-	char* pointer;
-}Shared_Mem;
-
-
-
 struct child_process {
 	int barrier_blocked;
 	int client_sock;
@@ -27,6 +19,28 @@ struct child_process {
 	int connected_flag;
 	int message_received_flag;
 };
+
+/**
+* Data structure used to manage the shared memory
+*/
+
+typedef struct Mem_Info_Node{
+	void * start_addr;
+	void * end_addr;		
+	long read_access;	// bit-wise operation to record read access of 
+						// this address range for at most 64 clients 
+	int writer_nid;		// node id of client with write access, only one can write
+	struct Mem_Info_Node* next; // Linked-list style manage allocated memory
+}Mem_Info_Node;
+
+typedef struct Shared_Mem{
+	int bcast_addr;
+	void * allocator_shared_memory_start_address; // never dereference these two pointer
+	void * next_start_pointer; // used to record where to start allocating memeory next time
+	Mem_Info_Node * min_head;
+}Shared_Mem;
+
+
 /**
 *	print to stdout the helper info.
 */

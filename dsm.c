@@ -87,6 +87,10 @@ void write_to_log(const char * s) {
 	}
 }
 
+void cleanUpMemInfoNodes(struct Mem_Info_Node * head) {
+
+}
+
 void cleanUp(int n_processes) {
 	if (log_file_fp != NULL) {
 		fclose(log_file_fp);
@@ -94,7 +98,8 @@ void cleanUp(int n_processes) {
 
 	munmap(shared, sizeof(struct Shared));
 	munmap(child_process_table, n_processes * sizeof(struct child_process));
-	munmap(shared_mem->pointer, getpagesize()*PAGE_NUM);
+	munmap(shared_mem->allocator_shared_memory_start_address, getpagesize()*PAGE_NUM);
+	cleanUpMemInfoNodes(shared_mem->min_head);
 	munmap(shared_mem, sizeof(struct Shared_Mem));
 }
 
@@ -212,9 +217,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
     while((*(child_process_table+node_n)).connected_flag) {
     	if((*(child_process_table+node_n)).message_received_flag == 0) {
-    		char msg[DATA_SIZE];
-    		sprintf(msg, "child-process continue, nid: %d\n", node_n);
-    		write_to_log(msg);
     		continue;
     	}
 
@@ -239,10 +241,10 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
  			debug_printf("child-process %d, start process sm_malloc (%d)\n", node_n, alloc_size);
 
  			memset((*(child_process_table+node_n)).client_message, 0, DATA_SIZE);
-			sprintf((*(child_process_table+node_n)).client_message, "%d", shared_mem->pointer);
+			sprintf((*(child_process_table+node_n)).client_message, "%d", shared_mem->allocator_shared_memory_start_address);
  			send(client_sock,(*(child_process_table+node_n)).client_message, strlen((*(child_process_table+node_n)).client_message),0);
 			debug_printf("child-process %d, msg being sent: %s, addr: 0x%x,  Number of bytes sent: %zu\n",
- 					node_n, (*(child_process_table+node_n)).client_message, shared_mem->pointer, strlen((*(child_process_table+node_n)).client_message));
+ 					node_n, (*(child_process_table+node_n)).client_message, shared_mem->allocator_shared_memory_start_address, strlen((*(child_process_table+node_n)).client_message));
 
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "sm_bcast", 8)==0){
  			int address = get_number((*(child_process_table+node_n)).client_message);
@@ -268,9 +270,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
  			node_n, (*(child_process_table+node_n)).client_message, strlen((*(child_process_table+node_n)).client_message));
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "read_fault", 10)==0){
 			continue;
-
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "write_fault", 11)==0){
-
 			continue;
 		}
 
@@ -283,7 +283,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     debug_printf("child-process %d exit\n", node_n);
     while(wait(NULL)>0) {}
 }
-
 
 
 
@@ -376,14 +375,12 @@ int main(int argc , char *argv[]) {
 	shared_mem = (struct Shared_Mem *)mmap(NULL, sizeof(struct Shared_Mem), 
 		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	(*shared_mem).bcast_addr = 0;
-	(*shared_mem).pointer = NULL;
-
+	(*shared_mem).allocator_shared_memory_start_address = create_mmap(-1); // -1 indicates parent, test only
+	(*shared_mem).next_start_pointer = shared_mem->allocator_shared_memory_start_address;
+	(*shared_mem).min_head = NULL;
 	// shared_mem->pointer = (char *)mmap(NULL, sizeof(char), 
 	// 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-	shared_mem->pointer = (char*)create_mmap(-1); // -1 indicates parent, test only
-
-
+	
 	/************************* fork child processes *******************/
 	FILE * fp = NULL;
 	if (strcmp(host_file, LOCALHOST) != 0) {
