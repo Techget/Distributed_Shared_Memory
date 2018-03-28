@@ -2,6 +2,9 @@
 #define	_DSM_H
 
 #define DATA_SIZE 4096
+// NOTICE! for bit-wise op, need to increase nid by 1 when doing it, 
+// since pid start from 0 instead of 1
+
 /**
 *	Data structure to record remote node in allocator
 */
@@ -9,10 +12,17 @@ typedef struct Shared{
 	int barrier_counter;
 	int online_counter;
 	int n_processes;
+	char data_allocator_need_cp_to_send[DATA_SIZE];
+	int length_data_allocator_need_cp_to_send;
+	unsigned long sm_malloc_request; // bit-wise recorder, used to notify allocator about sm_malloc request
 }Shared;
 
 struct child_process {
+	/* used for sm_barrier */
 	int barrier_blocked;
+	/* used for sm_malloc */
+	void * sm_mallocated_address;
+	/* general info of childe process*/
 	int client_sock;
 	int pid;
 	char client_message[DATA_SIZE];
@@ -25,9 +35,9 @@ struct child_process {
 */
 
 typedef struct Mem_Info_Node{
-	void * start_addr;
+	void * start_addr;  // never dereference 
 	void * end_addr;		
-	long read_access;	// bit-wise operation to record read access of 
+	unsigned long read_access;	// bit-wise operation to record read access of 
 						// this address range for at most 64 clients 
 	int writer_nid;		// node id of client with write access, only one can write
 	struct Mem_Info_Node* next; // Linked-list style manage allocated memory
@@ -35,11 +45,15 @@ typedef struct Mem_Info_Node{
 
 typedef struct Shared_Mem{
 	int bcast_addr;
+	int shared_memory_size;
 	void * allocator_shared_memory_start_address; // never dereference these two pointer
-	void * next_start_pointer; // used to record where to start allocating memeory next time
+	void * next_allocate_start_pointer; // used to record where to start allocating memeory next time
 	Mem_Info_Node * min_head;
+	Mem_Info_Node * min_tail;
 }Shared_Mem;
 
+
+// struct Mem_Info_Node * createNewMemInfoNode();
 
 /**
 *	print to stdout the helper info.

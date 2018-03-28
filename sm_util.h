@@ -10,20 +10,19 @@
 */
 #define DATA_SIZE 4096
 
-
-
-
 #ifdef DEBUG
 # define debug_printf(...) printf( __VA_ARGS__ );
 #else
 # define debug_printf(...) do {} while(0)
 #endif
 
-
-
 long get_number(char *str);
 void tcp_send_message(int sock, char *format, ...);
 void write_to_log(const char * s);
 void printHelpMsg();
 
+void setRecorderBitWithNid(unsigned long * recorder, int nid, int val);
+int recorderFindNidSetToOne(unsigned long * recorder);
+
+int getSmMallocSizeFromMsg(char * client_message);
 #endif

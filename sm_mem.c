@@ -19,7 +19,8 @@ void* create_mmap(int pid){
     prot = 0;
   }
 
-  alloc = mmap(address, bytes,prot ,
+  // change to use 'prot' later
+  alloc = mmap(address, bytes,PROT_READ | PROT_WRITE , 
                      MAP_ANONYMOUS|MAP_PRIVATE | MAP_FIXED, 0, 0);
 
   if (alloc == MAP_FAILED) {

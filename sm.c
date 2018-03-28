@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -87,7 +86,7 @@ void signaction_sigio_init(){
     sa.sa_flags = SA_RESTART | SA_SIGINFO;
     sigaction( SIGIO, &sa, NULL );
     fcntl( sock, F_SETOWN, getpid() );
-    fcntl( sock, F_SETSIG, SIGIO );
+    // fcntl( sock, F_SETSIG, SIGIO );
     fcntl( sock, F_SETFL, O_NONBLOCK | O_ASYNC );
 
 }
@@ -124,7 +123,7 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
 
     node_id = *nid;
 
-    signaction_segv_init();
+    // signaction_segv_init();
 
     signaction_sigio_init();
 
@@ -181,9 +180,9 @@ void *sm_malloc (size_t size){
     }
     char* alloc;
 
-    char message_send[DATA_SIZE], message_recv[DATA_SIZE];
+    char message_send[DATA_SIZE];
     memset(message_send, 0, DATA_SIZE);
-    sprintf(message_send, "sm_malloc%d", size);
+    sprintf(message_send, "sm_malloc %d", size);
     send(sock, message_send, strlen(message_send) , 0);
 
     //memset(message_recv, 0, DATA_SIZE);
