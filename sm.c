@@ -212,11 +212,11 @@ void sm_bcast (void **addr, int root_nid){
     memset(message_send, 0, DATA_SIZE);
 
     if(root_nid == node_id){
-        sprintf(message_send, "sm_bcast %d", *addr);
+        sprintf(message_send, "sm_bcast %p", *addr);
         send(sock, message_send, strlen(message_send) , 0);
         debug_printf("node %d: send sm_bcast with addr: %p\n", node_id, *addr);
     }else{
-        sprintf(message_send, "sm_bcast %d", 0);
+        sprintf(message_send, "sm_bcast_need_sync", 0);
         send(sock, message_send, strlen(message_send) , 0);
         debug_printf("node %d: send sm_bcast request, need to sync the address\n", node_id);
     }
@@ -226,7 +226,7 @@ void sm_bcast (void **addr, int root_nid){
     }
     message_set_flag = 0;
 
-    address = (void *)strtol(message, NULL, 10);
+    address = (void *)strtol(message, NULL, 16);
     debug_printf("node %d: receive sm_bcast addr: %p\n", node_id, address);
 
     if(root_nid != node_id){

@@ -34,6 +34,21 @@ int getSmMallocSizeFromMsg(char * client_message) {
 	return ret;
 }
 
+void * getBcastAddr(char * client_message) {
+	char * p = client_message;
+
+	while(*p) {
+		if (isdigit(*p)) {
+			break;
+		}
+		p++;
+	}
+
+	void * ret = (void *)strtol(p, NULL, 16);
+
+	return ret;
+}
+
 
 /* Extract oct number from string 
 	decode message with digit and '-' only, unable to decode hex

@@ -25,4 +25,5 @@ void setRecorderBitWithNid(unsigned long * recorder, int nid, int val);
 int recorderFindNidSetToOne(unsigned long * recorder);
 
 int getSmMallocSizeFromMsg(char * client_message);
+void * getBcastAddr(char * client_message);
 #endif

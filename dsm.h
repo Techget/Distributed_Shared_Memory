@@ -44,7 +44,7 @@ typedef struct Mem_Info_Node{
 }Mem_Info_Node;
 
 typedef struct Shared_Mem{
-	int bcast_addr;
+	void * bcast_addr;
 	int shared_memory_size;
 	void * allocator_shared_memory_start_address; // never dereference these two pointer
 	void * next_allocate_start_pointer; // used to record where to start allocating memeory next time

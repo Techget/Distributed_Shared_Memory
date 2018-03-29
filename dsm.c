@@ -253,29 +253,28 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 				strlen((*(child_process_table+node_n)).client_message));
 			
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "sm_bcast", 8)==0){
- 			int address = get_number((*(child_process_table+node_n)).client_message);
- 			debug_printf("child-process %d, start process sm_bcast (%x)\n", node_n, address);
-			if(address!=0){
- 				shared_mem->bcast_addr = address;
- 			}
+ 			debug_printf("child-process %d, sm_bcast\n", node_n);
+			if (strcmp("sm_bcast_need_sync", (*(child_process_table+node_n)).client_message) != 0) {
+				shared_mem->bcast_addr = getBcastAddr((*(child_process_table+node_n)).client_message);
+			}
 
  			// barrier in sm_bcast
  			(*(child_process_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
-			((*shared).barrier_counter)++;
- 			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
-			
+			((*shared).barrier_counter)++;			
  			while((*(child_process_table+node_n)).barrier_blocked) {
  				sleep(0);
  			}
+			debug_printf("child-process %d, after wait bcast\n",node_n);
+			send(client_sock,(*shared).data_allocator_need_cp_to_send, 
+ 				(*shared).length_data_allocator_need_cp_to_send,0);
 
-			debug_printf("child-process %d, after wait\n",node_n);
-			memset((*(child_process_table+node_n)).client_message, 0, DATA_SIZE);
- 			sprintf((*(child_process_table+node_n)).client_message, "%d", shared_mem->bcast_addr);
- 			send(client_sock,(*(child_process_table+node_n)).client_message, 
- 				strlen((*(child_process_table+node_n)).client_message),0);
+			// memset((*(child_process_table+node_n)).client_message, 0, DATA_SIZE);
+ 		// 	sprintf((*(child_process_table+node_n)).client_message, "%p", shared_mem->bcast_addr);
+ 		// 	send(client_sock,(*(child_process_table+node_n)).client_message, 
+ 		// 		strlen((*(child_process_table+node_n)).client_message),0);
  			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
- 				node_n, (*(child_process_table+node_n)).client_message, 
- 				strlen((*(child_process_table+node_n)).client_message));
+ 				node_n, (*shared).data_allocator_need_cp_to_send, 
+ 				(*shared).length_data_allocator_need_cp_to_send);
 
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "read_fault", 10)==0){
 			continue;
@@ -386,7 +385,7 @@ int main(int argc , char *argv[]) {
 
 	shared_mem = (struct Shared_Mem *)mmap(NULL, sizeof(struct Shared_Mem), 
 		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	(*shared_mem).bcast_addr = 0;
+	(*shared_mem).bcast_addr = NULL;
 	(*shared_mem).allocator_shared_memory_start_address = create_mmap(-1); // -1 indicates parent, test only
 	(*shared_mem).next_allocate_start_pointer = shared_mem->allocator_shared_memory_start_address;
 	(*shared_mem).shared_memory_size = getpagesize()*PAGE_NUM;
@@ -436,8 +435,15 @@ int main(int argc , char *argv[]) {
 	/******************* allocator start working *********************/ 
 	// wait until all the child-process exit, this line must be changed later.
 	while ((*shared).online_counter > 0) {
-		/* sm_barrier */
+		/* sm_barrier and sm_bcast */
 		if ((*shared).barrier_counter == n_processes) {
+			if (shared_mem->bcast_addr == NULL) {
+				memset((*shared).data_allocator_need_cp_to_send, 0,DATA_SIZE);	
+				char temp_addr[20]; 
+				sprintf(temp_addr,"%p", shared_mem->bcast_addr);
+				memcpy((*shared).data_allocator_need_cp_to_send, temp_addr, strlen(temp_addr));
+				(*shared).length_data_allocator_need_cp_to_send = strlen(temp_addr);
+			}
 			(*shared).barrier_counter = 0;
 			int i;
 			for(i=0; i<n_processes; i++) {
