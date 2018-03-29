@@ -227,14 +227,12 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			while((*(child_process_table+node_n)).barrier_blocked) {
 				sleep(0);
 			}
-
 			debug_printf("child-process %d, after wait\n",node_n);
 			send(client_sock,(*(child_process_table+node_n)).client_message, 
 				strlen((*(child_process_table+node_n)).client_message),0);
 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
 				node_n, (*(child_process_table+node_n)).client_message, 
 				strlen((*(child_process_table+node_n)).client_message));
-			// memset((*(child_process_table+node_n)).client_message, 0, DATA_SIZE);
 
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "sm_malloc", 9)==0){
  			printf("child-process %d, receive sm_malloc\n", node_n);
@@ -243,7 +241,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
  			while((*(child_process_table+node_n)).sm_mallocated_address == NULL) {
 				sleep(0);
 			}
-
 			// send valid or invalid address back to remote node
 			memset((*(child_process_table+node_n)).client_message, 0, DATA_SIZE);
 			sprintf((*(child_process_table+node_n)).client_message, "%d", 
@@ -254,7 +251,6 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 				node_n, (*(child_process_table+node_n)).client_message, 
 				(*(child_process_table+node_n)).sm_mallocated_address, 
 				strlen((*(child_process_table+node_n)).client_message));
-			// memset((*(child_process_table+node_n)).client_message, 0, DATA_SIZE);
 			
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "sm_bcast", 8)==0){
  			int address = get_number((*(child_process_table+node_n)).client_message);
@@ -280,6 +276,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
  			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
  				node_n, (*(child_process_table+node_n)).client_message, 
  				strlen((*(child_process_table+node_n)).client_message));
+
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "read_fault", 10)==0){
 			continue;
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "write_fault", 11)==0){
@@ -466,13 +463,11 @@ int main(int argc , char *argv[]) {
 			} else {
 				// actually allow allocating and set permissions
 				struct Mem_Info_Node * new_node = (struct Mem_Info_Node *)mmap(NULL, 
-				sizeof(struct Mem_Info_Node), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
-
+					sizeof(struct Mem_Info_Node), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
 				if (new_node == MAP_FAILED) {
 					printf("cannot create new Mem_Info_Node, allocator is quitting, remember to clear all processes manually\n");
 					return 1;
 				}
-
 				new_node->start_addr = shared_mem->next_allocate_start_pointer;
 				new_node->end_addr = new_node->start_addr + size_need_allocate;
 				shared_mem->next_allocate_start_pointer = new_node->end_addr + 1;
