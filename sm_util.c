@@ -37,6 +37,7 @@ int getSmMallocSizeFromMsg(char * client_message) {
 void * getBcastAddr(char * client_message) {
 	char * p = client_message;
 
+	// this is need more attention, false address, must start with 0x
 	while(*p) {
 		if (isdigit(*p)) {
 			break;
@@ -44,8 +45,7 @@ void * getBcastAddr(char * client_message) {
 		p++;
 	}
 
-	void * ret = (void *)strtol(p, NULL, 16);
-
+	void * ret = (void *)strtoul(p, NULL, 0);
 	return ret;
 }
 

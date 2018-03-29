@@ -235,7 +235,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 				strlen((*(child_process_table+node_n)).client_message));
 
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "sm_malloc", 9)==0){
- 			printf("child-process %d, receive sm_malloc\n", node_n);
+ 			debug_printf("child-process %d, receive sm_malloc\n", node_n);
  			(*(child_process_table+node_n)).sm_mallocated_address = NULL;
  			setRecorderBitWithNid(&((*shared).sm_malloc_request), node_n, 1);
  			while((*(child_process_table+node_n)).sm_mallocated_address == NULL) {
@@ -256,6 +256,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
  			debug_printf("child-process %d, sm_bcast\n", node_n);
 			if (strcmp("sm_bcast_need_sync", (*(child_process_table+node_n)).client_message) != 0) {
 				shared_mem->bcast_addr = getBcastAddr((*(child_process_table+node_n)).client_message);
+				printf("shared_mem->bcast_addr: %p", shared_mem->bcast_addr);
 			}
 
  			// barrier in sm_bcast

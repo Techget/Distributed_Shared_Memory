@@ -226,7 +226,7 @@ void sm_bcast (void **addr, int root_nid){
     }
     message_set_flag = 0;
 
-    address = (void *)strtol(message, NULL, 16);
+    address = (void *)strtoul(message, NULL, 16);
     debug_printf("node %d: receive sm_bcast addr: %p\n", node_id, address);
 
     if(root_nid != node_id){
