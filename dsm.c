@@ -437,7 +437,7 @@ int main(int argc , char *argv[]) {
 	while ((*shared).online_counter > 0) {
 		/* sm_barrier and sm_bcast */
 		if ((*shared).barrier_counter == n_processes) {
-			if (shared_mem->bcast_addr == NULL) {
+			if (shared_mem->bcast_addr != NULL) {
 				memset((*shared).data_allocator_need_cp_to_send, 0,DATA_SIZE);	
 				char temp_addr[20]; 
 				sprintf(temp_addr,"%p", shared_mem->bcast_addr);
