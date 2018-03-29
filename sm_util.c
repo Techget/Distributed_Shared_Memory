@@ -21,6 +21,7 @@ int getSmMallocSizeFromMsg(char * client_message) {
 		if (isdigit(*p)) {
 			break;
 		}
+		p++;
 	}
 
 	int ret = atoi(p);

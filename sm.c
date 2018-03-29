@@ -30,11 +30,12 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx){
 
     int temp = recv(sock, message_recv, DATA_SIZE, 0);
 
-    printf ("Caught a SIGIO.................Message: %s\n", message_recv);
+    printf ("Node_id: %d, Caught a SIGIO.................Message: %s\n", node_id, message_recv);
     if(strcmp(message_recv, "EXCEPTION")==0){
         // process exception
     }else{
         strcpy(message, message_recv);
+        // do not set message_set_flag when receive the write-invalidate
         message_set_flag = 1;
         debug_printf("set message_set_flag =1\n");
     }
@@ -169,7 +170,8 @@ void sm_barrier(void) {
 }
 
 
-/* Allocate object of `size' byte in SM.
+/**
+ * Allocate object of `size' byte in SM.
  *
  * - Returns NULL if allocation failed.
  */
@@ -178,7 +180,7 @@ void *sm_malloc (size_t size){
         printf("Run sm_node_init first\n");
         return;
     }
-    char* alloc;
+    void* alloc;
 
     char message_send[DATA_SIZE];
     memset(message_send, 0, DATA_SIZE);
@@ -192,7 +194,11 @@ void *sm_malloc (size_t size){
     }
     message_set_flag = 0;
 
-    alloc = (char*)strtol(message, NULL, 10);
+    alloc = (void*)strtol(message, NULL, 10);
+
+    if (alloc == (void *)INVALID_MALLOC_ADDR) {
+        return NULL;
+    }
 
     return alloc;
 }

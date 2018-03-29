@@ -13,7 +13,7 @@ void* create_mmap(int pid){
   bytes = getpagesize()*PAGE_NUM;
 
 
-  if(pid = -1){ // allow full access in allocator
+  if(pid == -1){ // allow full access in allocator
     prot = PROT_READ | PROT_WRITE;
   }else{        // no w/r access in client
     prot = 0;
@@ -28,8 +28,8 @@ void* create_mmap(int pid){
     exit(0);
   }
 
-  printf("node %d: ..................addr after mmap: 0x%x\n",pid, address);
-  printf("node %d: ............................alloc: 0x%x\n",pid, alloc);
+  printf("node %d: ..................addr after mmap: %p\n",pid, address);
+  printf("node %d: ............................alloc: %p\n",pid, alloc);
 
   return alloc;
 }
