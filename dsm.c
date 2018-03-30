@@ -591,7 +591,7 @@ int main(int argc , char *argv[]) {
 					while((*shared).allocator_wait_revoking_write_permission) {
 						sleep(0);
 					}
-										mem_info_node->writer_nid = -1;
+					mem_info_node->writer_nid = -1;
 				}
 				/* third, set the read permission recorder, send the control info and content back to 
 				 requesting remote node */
@@ -603,11 +603,9 @@ int main(int argc , char *argv[]) {
 				// do not omit the space in the message
 		        sprintf(header, "read_fault %p %d ", mem_info_node->start_addr, send_data_size); 
 		        sprintf((*(child_process_table + segv_fault_request_nid)).client_send_message, "%s", header);
-	
-		     
 		        memcpy((void *)((*(child_process_table + segv_fault_request_nid)).client_send_message+strlen(header)), 
 		        	mem_info_node->start_addr, send_data_size);
-		        // printf("~~~~~~~~~~~~~~%s\n", (*(child_process_table + segv_fault_request_nid)).client_send_message);
+		        // notify the child process to reply to segv_fault remote node
 		        kill((*(child_process_table + segv_fault_request_nid)).pid, SIGUSR1);
 			}
 
