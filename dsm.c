@@ -528,8 +528,9 @@ int main(int argc , char *argv[]) {
 				}
 				new_node->start_addr = shared_mem->next_allocate_start_pointer;
 				new_node->end_addr = new_node->start_addr + size_need_allocate;
+
 				shared_mem->next_allocate_start_pointer = 
-					getPageBaseOfAddr(getPageBaseOfAddr(new_node->end_addr) + 4096);
+					getPageBaseOfAddr(getPageBaseOfAddr(new_node->end_addr+4096));
 				setRecorderBitWithNid(&((*new_node).read_access), sm_malloc_request_nid, 1);
 				(*new_node).writer_nid =  sm_malloc_request_nid;
 				new_node->next = NULL;
@@ -572,6 +573,38 @@ int main(int argc , char *argv[]) {
 				 have the read permission */
 				assert(mem_info_node->writer_nid == -1);
 				/* first, send out write-invalidate message to remote node who is reading this memory */
+				debug_printf("***************** write_fault\n");
+
+				unsigned long num = mem_info_node->read_access;
+				debug_printf("read access: %p\n", num);
+				debug_printf("writer nid : %d\n", mem_info_node->writer_nid);
+				int bit;
+				
+				for(bit=0;bit<(sizeof(unsigned long) * 8); bit++){
+					// node with read access
+					if(num & 0x01){
+						debug_printf("Node: %d  ;read premission: %d\n", bit, num & 0x01);
+						
+
+					/*
+					memset((*(child_process_table + mem_info_node->writer_nid)).client_send_message, 
+						0, DATA_SIZE);
+					sprintf((*(child_process_table + mem_info_node->writer_nid)).client_send_message, 
+						"write_invalidate %p %p", 
+						mem_info_node->start_addr, mem_info_node->end_addr);
+					(*shared).allocator_wait_revoking_write_permission = 1;
+					kill((*(child_process_table + mem_info_node->writer_nid)).pid, SIGUSR1);
+					*/
+
+
+					}
+
+					num = num >> 1;
+				}
+
+
+
+
 
 				/* second, remove all the read permission, set the r&w permission for this requesting node */
 

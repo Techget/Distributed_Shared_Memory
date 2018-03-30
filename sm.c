@@ -35,8 +35,17 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx) {
 
     printf ("Node_id: %d, Caught a SIGIO.................Message: %s\n", node_id, message_recv);
     if(strncmp(message_recv, WI_MSG, strlen(WI_MSG)) == 0) {
+    	// receive write invalidate message
+        void * start_add = getFirstAddrFromMsg(message_recv);
+        void * end_add = getSecondAddrFromMsg(message_recv);
+        int size = (int)(end_add - start_add);
+        mprotect(start_add, size, PROT_NONE);
+
+        
+
 
     } else if(strncmp(message_recv, WPR_MSG, strlen(WPR_MSG)) == 0) {
+    	// receive write premission revoke
         void * start_add = getFirstAddrFromMsg(message_recv);
         void * end_add = getSecondAddrFromMsg(message_recv);
         int size = (int)(end_add - start_add);
