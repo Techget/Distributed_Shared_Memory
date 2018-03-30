@@ -243,7 +243,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			}
 			// send valid or invalid address back to remote node
 			memset((*(child_process_table+node_n)).client_message, 0, DATA_SIZE);
-			sprintf((*(child_process_table+node_n)).client_message, "%d", 
+			sprintf((*(child_process_table+node_n)).client_message, "%p", 
 				(*(child_process_table+node_n)).sm_mallocated_address);
  			send(client_sock,(*(child_process_table+node_n)).client_message, 
  				strlen((*(child_process_table+node_n)).client_message),0);
@@ -268,19 +268,14 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			debug_printf("child-process %d, after wait bcast\n",node_n);
 			send(client_sock,(*shared).data_allocator_need_cp_to_send, 
  				(*shared).length_data_allocator_need_cp_to_send,0);
-
-			// memset((*(child_process_table+node_n)).client_message, 0, DATA_SIZE);
- 		// 	sprintf((*(child_process_table+node_n)).client_message, "%p", shared_mem->bcast_addr);
- 		// 	send(client_sock,(*(child_process_table+node_n)).client_message, 
- 		// 		strlen((*(child_process_table+node_n)).client_message),0);
  			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
  				node_n, (*shared).data_allocator_need_cp_to_send, 
  				(*shared).length_data_allocator_need_cp_to_send);
 
-		}else if(strncmp((*(child_process_table+node_n)).client_message, "read_fault", 10)==0){
-			continue;
-		}else if(strncmp((*(child_process_table+node_n)).client_message, "write_fault", 11)==0){
-			continue;
+		}else if(strncmp((*(child_process_table+node_n)).client_message, "segv_fault", strlen("segv_fault"))==0){
+			
+		}else {
+
 		}
 
 		(*(child_process_table+node_n)).message_received_flag--;
@@ -380,6 +375,7 @@ int main(int argc , char *argv[]) {
 	memset((*shared).data_allocator_need_cp_to_send, 0,DATA_SIZE );
 	(*shared).length_data_allocator_need_cp_to_send = 0;
 	(*shared).sm_malloc_request = 0;
+	(*shared).segv_fault_request = 0;
 
 	child_process_table = (struct child_process *)mmap(NULL, sizeof(struct child_process)*n_processes, 
 		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
@@ -427,6 +423,7 @@ int main(int argc , char *argv[]) {
 	   		(*(child_process_table + i)).barrier_blocked = 0;
 	   		(*(child_process_table + i)).sm_mallocated_address = NULL;
 			memset((*(child_process_table + i)).client_message, 0,DATA_SIZE );
+			memset((*(child_process_table + i)).client_send_message, 0,DATA_SIZE );
 	    }
 	}
 	if (fp != NULL) {
@@ -452,9 +449,8 @@ int main(int argc , char *argv[]) {
 			}
 		} 
 		/* sm_malloc */
-		if ((*shared).sm_malloc_request > 0) {
+		else if ((*shared).sm_malloc_request > 0) { 
 			int sm_malloc_request_nid = recorderFindNidSetToOne(&((*shared).sm_malloc_request));
-
 			// get the size it needs to allocate
 			int size_need_allocate = getSmMallocSizeFromMsg(
 				(*(child_process_table + sm_malloc_request_nid)).client_message);
@@ -472,7 +468,8 @@ int main(int argc , char *argv[]) {
 				struct Mem_Info_Node * new_node = (struct Mem_Info_Node *)mmap(NULL, 
 					sizeof(struct Mem_Info_Node), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
 				if (new_node == MAP_FAILED) {
-					printf("cannot create new Mem_Info_Node, allocator is quitting, remember to clear all processes manually\n");
+					printf("cannot create new Mem_Info_Node, allocator is exiting, remember to clear all processes manually\n");
+					cleanUp(n_processes);
 					return 1;
 				}
 				new_node->start_addr = shared_mem->next_allocate_start_pointer;
@@ -498,6 +495,10 @@ int main(int argc , char *argv[]) {
 			}
 			// restore the bit-wise recorder
 			setRecorderBitWithNid(&((*shared).sm_malloc_request), sm_malloc_request_nid, 0);
+		} 
+		/* segv fault */
+		else if ((*shared).sm_malloc_request > 0) { 
+
 		}
 	}
 

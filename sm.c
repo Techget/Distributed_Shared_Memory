@@ -22,7 +22,7 @@ static int message_set_flag = 0;
 #define WPR_MSG "write_permission_revoke"
 #define WI_MSG "write_invalidate"
 
-void sigio_handler (int signum, siginfo_t *si, void *ctx){
+void sigio_handler (int signum, siginfo_t *si, void *ctx) {
     char message_recv[DATA_SIZE];
     memset(message_recv, 0, DATA_SIZE);
     if (SIGIO != signum) {
@@ -46,7 +46,7 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx){
 }
 
 
-void segv_handler (int signum, siginfo_t *si, void *ctx){
+void segv_handler (int signum, siginfo_t *si, void *ctx) {
     void *addr;
 
     if (SIGSEGV != signum) {
@@ -60,12 +60,12 @@ void segv_handler (int signum, siginfo_t *si, void *ctx){
         return;
     }
 
-    char message[DATA_SIZE];
-    memset(message, 0, DATA_SIZE);
-    sprintf(message, "segv_fault=%p", addr);
-    send(sock, message, strlen(message) , 0);
+    char message_send[DATA_SIZE];
+    memset(message_send, 0, DATA_SIZE);
+    sprintf(message_send, "segv_fault=%p", addr);
+    send(sock, message_send, strlen(message_send) , 0);
 
-    while(!message_set_flag){
+    while(!message_set_flag) {
         sleep(0);
     }
     message_set_flag = 0;
@@ -82,7 +82,7 @@ void segv_handler (int signum, siginfo_t *si, void *ctx){
 /*
     Catch SEGV fault in client program
 */
-void signaction_segv_init(){
+void signaction_segv_init() {
     struct sigaction sa;
 
     sa.sa_sigaction = segv_handler;
@@ -91,7 +91,7 @@ void signaction_segv_init(){
     sigaction (SIGSEGV, &sa, NULL);       /* set the signal handler... */
 }
 
-void signaction_sigio_init(){
+void signaction_sigio_init() {
     struct sigaction sa;
     memset( &sa, 0, sizeof(struct sigaction) );
     sigemptyset( &sa.sa_mask );
@@ -101,7 +101,6 @@ void signaction_sigio_init(){
     fcntl( sock, F_SETOWN, getpid() );
     // fcntl( sock, F_SETSIG, SIGIO );
     fcntl( sock, F_SETFL, O_NONBLOCK | O_ASYNC );
-
 }
 
 int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
@@ -200,11 +199,14 @@ void *sm_malloc (size_t size){
     }
     message_set_flag = 0;
 
-    alloc = (void*)strtol(message, NULL, 10);
+    alloc = (void*)strtoul(message, NULL, 16);
 
     if (alloc == (void *)INVALID_MALLOC_ADDR) {
         return NULL;
     }
+
+    debug_printf("remote node %d receive sm_malloc address: %p\n", node_id, alloc);
+    mprotect(alloc, size, PROT_READ|PROT_WRITE);
 
     return alloc;
 }
