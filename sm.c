@@ -62,7 +62,7 @@ void segv_handler (int signum, siginfo_t *si, void *ctx) {
 
     char message_send[DATA_SIZE];
     memset(message_send, 0, DATA_SIZE);
-    sprintf(message_send, "segv_fault=%p", addr);
+    sprintf(message_send, "segv_fault %p", addr);
     send(sock, message_send, strlen(message_send) , 0);
 
     while(!message_set_flag) {

@@ -14,6 +14,11 @@ int recorderFindNidSetToOne(unsigned long * recorder) {
 	return temp;
 }
 
+int checkRecorderNidthBitIsSetToOne(unsigned long * recorder, int nid) {
+	return (int)(((*recorder)>>nid) & 1);
+}
+
+
 int getSmMallocSizeFromMsg(char * client_message) {
 	char * p = client_message;
 
@@ -34,7 +39,7 @@ int getSmMallocSizeFromMsg(char * client_message) {
 	return ret;
 }
 
-void * getBcastAddr(char * client_message) {
+void * getFirstAddrFromMsg(char * client_message) {
 	char * p = client_message;
 
 	// this is need more attention, false address, must start with 0x
@@ -48,7 +53,6 @@ void * getBcastAddr(char * client_message) {
 	void * ret = (void *)strtoul(p, NULL, 0);
 	return ret;
 }
-
 
 /* Extract oct number from string 
 	decode message with digit and '-' only, unable to decode hex

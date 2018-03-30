@@ -18,6 +18,7 @@
 #include <pthread.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <assert.h>
 
 #include "dsm.h"
 #include "sm_mem.h"
@@ -35,6 +36,41 @@ static struct Shared* shared; // shared info between allocator and child process
 static struct Shared_Mem* shared_mem; // used to manage shared memory on allocator
 static struct child_process * child_process_table; 
 static FILE * log_file_fp;
+
+
+void write_to_log(const char * s) {
+	if (log_file_fp != NULL) {
+		fprintf(log_file_fp, "%s", s);
+	}
+}
+
+void cleanUpMemInfoNodes(struct Mem_Info_Node * head) {
+
+}
+
+void cleanUp(int n_processes) {
+	if (log_file_fp != NULL) {
+		fclose(log_file_fp);
+	}
+
+	munmap(shared, sizeof(struct Shared));
+	munmap(child_process_table, n_processes * sizeof(struct child_process));
+	munmap(shared_mem->allocator_shared_memory_start_address, (*shared_mem).shared_memory_size);
+	cleanUpMemInfoNodes(shared_mem->min_head);
+	munmap(shared_mem, sizeof(struct Shared_Mem));
+}
+
+struct Mem_Info_Node * findMemInfoNode(struct Mem_Info_Node* head, void * fault_address) {
+	struct Mem_Info_Node * temp_node = head;
+	while (!(temp_node != NULL && 
+		fault_address >= temp_node->start_addr && 
+		fault_address <= temp_node->end_addr)) {
+
+		temp_node = temp_node->next;
+	}
+
+	return temp_node;
+}
 
 void child_process_SIGUSR1_handler(int signum, siginfo_t *si, void *ctx) {
 	int pid = getpid(); // use pid to get nid
@@ -79,29 +115,6 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 	debug_printf("child-process %d, msg Received %s\n", nid,
 		(*(child_process_table+nid)).client_message); 
 }
-
-void write_to_log(const char * s) {
-	if (log_file_fp != NULL) {
-		fprintf(log_file_fp, "%s", s);
-	}
-}
-
-void cleanUpMemInfoNodes(struct Mem_Info_Node * head) {
-
-}
-
-void cleanUp(int n_processes) {
-	if (log_file_fp != NULL) {
-		fclose(log_file_fp);
-	}
-
-	munmap(shared, sizeof(struct Shared));
-	munmap(child_process_table, n_processes * sizeof(struct child_process));
-	munmap(shared_mem->allocator_shared_memory_start_address, (*shared_mem).shared_memory_size);
-	cleanUpMemInfoNodes(shared_mem->min_head);
-	munmap(shared_mem, sizeof(struct Shared_Mem));
-}
-
 
 void childProcessMain(int node_n, int n_processes, char * host_name, 
 	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {	
@@ -255,7 +268,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "sm_bcast", 8)==0){
  			debug_printf("child-process %d, sm_bcast\n", node_n);
 			if (strcmp("sm_bcast_need_sync", (*(child_process_table+node_n)).client_message) != 0) {
-				shared_mem->bcast_addr = getBcastAddr((*(child_process_table+node_n)).client_message);
+				shared_mem->bcast_addr = getFirstAddrFromMsg((*(child_process_table+node_n)).client_message);
 				printf("shared_mem->bcast_addr: %p", shared_mem->bcast_addr);
 			}
 
@@ -273,7 +286,9 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
  				(*shared).length_data_allocator_need_cp_to_send);
 
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "segv_fault", strlen("segv_fault"))==0){
-			
+			debug_printf("child-process %d, receive segv_fault\n", node_n);
+			setRecorderBitWithNid(&((*shared).segv_fault_request), node_n, 1);
+			// leave everything else to allocator
 		}else {
 
 		}
@@ -498,7 +513,38 @@ int main(int argc , char *argv[]) {
 		} 
 		/* segv fault */
 		else if ((*shared).sm_malloc_request > 0) { 
+			int segv_fault_request_nid = recorderFindNidSetToOne(&((*shared).segv_fault_request));
+			void * fault_address = getFirstAddrFromMsg((*(child_process_table+segv_fault_request_nid)).client_message);
 
+			// find corresponding Mem_Info_Node
+			struct Mem_Info_Node * mem_info_node = findMemInfoNode(shared_mem->min_head, fault_address);
+			if (mem_info_node == NULL) {
+				printf("!!!!!!!!! corresponding mem_info_node not found, allocator exiting\n");
+				// this can be improved later!!, handle this case later
+				return 1;				
+			}
+
+			if (checkRecorderNidthBitIsSetToOne(&(mem_info_node->read_access), segv_fault_request_nid)){
+				// write fault, at this stage there shouldn't be anyone has write-access, itself already
+				// have the read permission
+				assert(mem_info_node->writer_nid == -1);
+
+				// first, send out write-invalidate message to remote node who is reading this memory
+
+				// second, remove all the read permission, set the r&w permission for this requesting node
+
+			} else {
+				// read fault
+				// first, revoke the write permission from other nodes
+				if (mem_info_node->writer_nid != -1) {
+
+				}
+				// second, get the content from other nodes
+
+				// third, set the read permission recorder, send the control info and content back to 
+				// requesting remote node
+
+			}
 		}
 	}
 

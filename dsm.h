@@ -55,7 +55,10 @@ typedef struct Shared_Mem{
 }Shared_Mem;
 
 
-// struct Mem_Info_Node * createNewMemInfoNode();
+/**
+*	Traverse linked-list, find corresponding mem_info_node, return NULL if not find.
+*/
+struct Mem_Info_Node * findMemInfoNode(struct Mem_Info_Node* head, void * fault_address);
 
 /**
 *	print to stdout the helper info.
@@ -72,6 +75,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 *	Clean up 
 */
 void cleanUp(int n_processes);
+
 
 
 #endif // _DSM_H
