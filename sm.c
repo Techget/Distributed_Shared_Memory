@@ -25,7 +25,6 @@ static int message_set_flag = 0;
 void sigio_handler (int signum, siginfo_t *si, void *ctx){
     char message_recv[DATA_SIZE];
     memset(message_recv, 0, DATA_SIZE);
-    memset(message, 0, DATA_SIZE);
     if (SIGIO != signum) {
         printf ("Panic!");
         exit (1);
@@ -39,11 +38,11 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx){
     } else if(strncmp(message_recv, WPR_MSG, strlen(WPR_MSG)) == 0) {
 
     } else {
+        memset(message, 0, DATA_SIZE);
         strcpy(message, message_recv);
         message_set_flag = 1;
         debug_printf("set message_set_flag =1\n");
     }
-
 }
 
 
@@ -63,9 +62,21 @@ void segv_handler (int signum, siginfo_t *si, void *ctx){
 
     char message[DATA_SIZE];
     memset(message, 0, DATA_SIZE);
-    sprintf(message, "SEGV=%p", addr);
+    sprintf(message, "segv_fault=%p", addr);
     send(sock, message, strlen(message) , 0);
-    // exit (0);
+
+    while(!message_set_flag){
+        sleep(0);
+    }
+    message_set_flag = 0;
+
+    if (strncmp(message, "read_fault", strlen("read_fault")) == 0) {
+
+    } else if (strncmp(message, "write_fault", strlen("write_fault")) == 0) {
+
+    } else {
+        printf("remote node %d, receive unknown segv_fault reply: %s\n", node_id, message);
+    }
 }
 
 /*
@@ -230,7 +241,7 @@ void sm_bcast (void **addr, int root_nid){
     }
     message_set_flag = 0;
 
-    address = (void *)strtoul(message, NULL, 16);
+    address = (void *)strtoul(message, NULL, 16); 
     debug_printf("node %d: receive sm_bcast addr: %p\n", node_id, address);
 
     if(root_nid != node_id){
