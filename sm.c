@@ -78,14 +78,19 @@ void segv_handler (int signum, siginfo_t *si, void *ctx) {
     send(sock, message_send, strlen(message_send) , 0);
 
     // wait for response, change to blocked mode temporarily
-    int opts;
-    opts = fcntl(sock,F_GETFL);
-    opts = opts & (~O_ASYNC);
-    opts = opts & (~O_NONBLOCK);
-    fcntl(sock,F_SETFL,opts);
+    // int opts;
+    // opts = fcntl(sock,F_GETFL);
+    // opts = opts & (~O_ASYNC);
+    // opts = opts & (~O_NONBLOCK);
+    // fcntl(sock,F_SETFL,opts);
 
-    memset(message, 0, DATA_SIZE);
-    int temp = recv(sock, message, DATA_SIZE, 0);
+    // memset(message, 0, DATA_SIZE);
+    // int temp = recv(sock, message, DATA_SIZE, 0);
+
+    while(!message_set_flag){
+        sleep(0);
+    }
+    message_set_flag = 0;
 
     if (strncmp(message, "read_fault", strlen("read_fault")) == 0) {
         void * start_addr = getFirstAddrFromMsg(message);
@@ -120,7 +125,7 @@ void segv_handler (int signum, siginfo_t *si, void *ctx) {
     }
 
     // change back to sigio
-    fcntl( sock, F_SETFL,  O_NONBLOCK |O_ASYNC );
+    // fcntl( sock, F_SETFL,  O_NONBLOCK |O_ASYNC );
 }
 
 /*
