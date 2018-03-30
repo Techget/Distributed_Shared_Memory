@@ -12,16 +12,18 @@ void* create_mmap(int pid){
 
   bytes = getpagesize()*PAGE_NUM;
 
+  int flags;
 
   if(pid == -1){ // allow full access in allocator
     prot = PROT_READ | PROT_WRITE;
+    flags = MAP_FIXED | MAP_ANONYMOUS| MAP_SHARED;
   }else{        // no w/r access in client
     prot = 0;
+    flags = MAP_ANONYMOUS|MAP_PRIVATE | MAP_FIXED;
   }
 
   // change to use 'prot' later
-  alloc = mmap(address, bytes,PROT_READ | PROT_WRITE , 
-                     MAP_ANONYMOUS|MAP_PRIVATE | MAP_FIXED, 0, 0);
+  alloc = mmap(address, bytes, prot , flags, 0, 0);
 
   if (alloc == MAP_FAILED) {
     perror("mmap failed.....................................");

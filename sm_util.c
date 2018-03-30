@@ -54,29 +54,59 @@ void * getFirstAddrFromMsg(char * client_message) {
 	return ret;
 }
 
+void * getSecondAddrFromMsg(char * client_message) {
+	char * p = client_message;
+
+	// this is need more attention, false address, must start with 0x
+	while(*p) {
+		if (isdigit(*p)) {
+			break;
+		}
+		p++;
+	}
+
+	strtoul(p, &p, 0);
+
+	// this approach is stupid, should improve later
+	while(*p) {
+		if (isdigit(*p)) {
+			break;
+		}
+		p++;
+	}
+
+	void * ret = (void *)strtoul(p, NULL, 0);
+	return ret;
+}
+
+void * getPageBaseOfAddr(void * addr) {
+	void * page_base = (void *)((int)addr & ~(getpagesize()-1));
+	return page_base;
+}
+
 /* Extract oct number from string 
 	decode message with digit and '-' only, unable to decode hex
 */
-long get_number(char *str){
-	char *p = str;
-	long val;
-	while (*p) { 
-	    if (isdigit(*p)||*p=='-') { 
-	        val = strtol(p, &p, 10); 
-	    } else { 
-	        p++;
-	    }
-	}
+// long get_number(char *str){
+// 	char *p = str;
+// 	long val;
+// 	while (*p) { 
+// 	    if (isdigit(*p)||*p=='-') { 
+// 	        val = strtol(p, &p, 10); 
+// 	    } else { 
+// 	        p++;
+// 	    }
+// 	}
 
-	return val;
-}
+// 	return val;
+// }
 
 
-void tcp_send_message(int sock, char *format, ...){
-	char message[DATA_SIZE];
-	memset(message, 0, DATA_SIZE);
-	sprintf(message, format);
-	send(sock,message, strlen(message),0);
-	debug_printf("tcp msg being sent: %s, Number of bytes sent: %zu\n",
-				 message, strlen(message));
-}
+// void tcp_send_message(int sock, char *format, ...){
+// 	char message[DATA_SIZE];
+// 	memset(message, 0, DATA_SIZE);
+// 	sprintf(message, format);
+// 	send(sock,message, strlen(message),0);
+// 	debug_printf("tcp msg being sent: %s, Number of bytes sent: %zu\n",
+// 				 message, strlen(message));
+// }

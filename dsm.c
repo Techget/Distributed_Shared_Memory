@@ -37,7 +37,7 @@ static struct Shared_Mem* shared_mem; // used to manage shared memory on allocat
 static struct child_process * child_process_table; 
 static FILE * log_file_fp;
 
-
+/* helper functions */
 void write_to_log(const char * s) {
 	if (log_file_fp != NULL) {
 		fprintf(log_file_fp, "%s", s);
@@ -72,6 +72,7 @@ struct Mem_Info_Node * findMemInfoNode(struct Mem_Info_Node* head, void * fault_
 	return temp_node;
 }
 
+/* signal handlers */
 void child_process_SIGUSR1_handler(int signum, siginfo_t *si, void *ctx) {
 	int pid = getpid(); // use pid to get nid
 	int nid = 0;
@@ -79,9 +80,9 @@ void child_process_SIGUSR1_handler(int signum, siginfo_t *si, void *ctx) {
 		if ((*(child_process_table+nid)).pid == pid) break;
 	}
 
-	memcpy((*(child_process_table+nid)).client_message, "hello world", 12);
-	send((*(child_process_table+nid)).client_sock,(*(child_process_table+nid)).client_message, 	
-		strlen((*(child_process_table+nid)).client_message),0);
+	debug_printf("child process %d, SIGUSR1, sending message %s\n", nid, (*(child_process_table+nid)).client_send_message);
+	send((*(child_process_table+nid)).client_sock,(*(child_process_table+nid)).client_send_message, 	
+		strlen((*(child_process_table+nid)).client_send_message), 0);
 }
 
 void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
@@ -98,9 +99,12 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 	// debug_printf("inside child_process_SIGIO_handler nid: %d, siginfo_t si_code: %d, si_band: %d, si_fd: %d", 
 	// 	nid, si->si_code, si->si_band, si->si_fd);
 
-	memset((*(child_process_table+nid)).client_message, 0,DATA_SIZE );
-	int num = recv((*(child_process_table+nid)).client_sock,
-		(*(child_process_table+nid)).client_message, DATA_SIZE, 0);
+	char message_recv[DATA_SIZE];
+    memset(message_recv, 0, DATA_SIZE);
+
+	int num = recv((*(child_process_table+nid)).client_sock, message_recv, DATA_SIZE, 0);
+	// printf("~~~~~~~~%s~~~~%d\n", message_recv, strncmp(message_recv, "retrieved_content", strlen("retrieved_content")));
+
 	if (num == -1) {
         perror("recv");
         exit(1);
@@ -109,13 +113,46 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 		(*(child_process_table+nid)).connected_flag = 0;
 		debug_printf("child process: %d, connection closed\n", nid);
 		return;
+	} else if (strncmp(message_recv, "retrieved_content", strlen("retrieved_content")) == 0) {
+		// !!!!!REMEMBER to deal with case where data is larger than defined DATA_SIZE
+		printf("child process: %d, get retrieved_content: %s\n", nid, message_recv);
+		void * start_addr = getFirstAddrFromMsg(message_recv);
+		int received_data_size = 0;
+		char * p = message_recv;
+		int space_counter = 0;
+		while (*p) {
+			if (*p == ' ') {
+				space_counter += 1;
+				p++;
+				continue;
+			}
+			if (space_counter == 2) {
+				received_data_size = strtol(p, &p, 10);
+				continue;
+			}
+			if (space_counter == 3) {
+				break;
+			}
+			p++;
+		}
+		assert(received_data_size != 0);
+		assert(space_counter == 3);
+		// save the data to shared memory on allocator
+		memcpy(start_addr, (void *)p, received_data_size);
+		// printf("~~~~~~~~%p check it is written: %c~~~\n", start_addr, *((char *)start_addr));
+		msync(start_addr, received_data_size, MS_SYNC);
+		// unblock allocator, the write permission will be modified in allocator
+		(*shared).allocator_wait_revoking_write_permission = 0;	
+	} else {
+		memset((*(child_process_table+nid)).client_message, 0,DATA_SIZE );
+		strcpy((*(child_process_table+nid)).client_message, message_recv);
+		(*(child_process_table+nid)).message_received_flag++;
+		debug_printf("child-process %d, msg Received %s\n", nid,
+			(*(child_process_table+nid)).client_message);
 	}
-
-	(*(child_process_table+nid)).message_received_flag++;
-	debug_printf("child-process %d, msg Received %s\n", nid,
-		(*(child_process_table+nid)).client_message); 
 }
 
+/* main function of child process */
 void childProcessMain(int node_n, int n_processes, char * host_name, 
 	char * executable_file, char ** clnt_program_options, int n_clnt_program_option) {	
 	// Side Note, after fork, the pointer also point to the same virtual addr, tested.
@@ -290,7 +327,8 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			setRecorderBitWithNid(&((*shared).segv_fault_request), node_n, 1);
 			// leave everything else to allocator
 		}else {
-
+			printf("!!!!!!!!Child-process %d receive Unknown msg: %s\n", node_n,
+				(*(child_process_table+node_n)).client_message);
 		}
 
 		(*(child_process_table+node_n)).message_received_flag--;
@@ -391,6 +429,7 @@ int main(int argc , char *argv[]) {
 	(*shared).length_data_allocator_need_cp_to_send = 0;
 	(*shared).sm_malloc_request = 0;
 	(*shared).segv_fault_request = 0;
+	(*shared).allocator_wait_revoking_write_permission = 0;
 
 	child_process_table = (struct child_process *)mmap(NULL, sizeof(struct child_process)*n_processes, 
 		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
@@ -489,7 +528,8 @@ int main(int argc , char *argv[]) {
 				}
 				new_node->start_addr = shared_mem->next_allocate_start_pointer;
 				new_node->end_addr = new_node->start_addr + size_need_allocate;
-				shared_mem->next_allocate_start_pointer = new_node->end_addr + 1;
+				shared_mem->next_allocate_start_pointer = 
+					getPageBaseOfAddr(getPageBaseOfAddr(new_node->end_addr) + 4096);
 				setRecorderBitWithNid(&((*new_node).read_access), sm_malloc_request_nid, 1);
 				(*new_node).writer_nid =  sm_malloc_request_nid;
 				new_node->next = NULL;
@@ -506,15 +546,17 @@ int main(int argc , char *argv[]) {
 
 				debug_printf("new_node->start_addr: %p\n", new_node->start_addr);
 				// notify child-process that the memory is allocated
-				(*(child_process_table+sm_malloc_request_nid)).sm_mallocated_address = new_node->start_addr;
+				(*(child_process_table+sm_malloc_request_nid)).sm_mallocated_address = 
+					new_node->start_addr;
 			}
 			// restore the bit-wise recorder
 			setRecorderBitWithNid(&((*shared).sm_malloc_request), sm_malloc_request_nid, 0);
 		} 
 		/* segv fault */
-		else if ((*shared).sm_malloc_request > 0) { 
+		else if ((*shared).segv_fault_request > 0) { 
 			int segv_fault_request_nid = recorderFindNidSetToOne(&((*shared).segv_fault_request));
-			void * fault_address = getFirstAddrFromMsg((*(child_process_table+segv_fault_request_nid)).client_message);
+			void * fault_address = getFirstAddrFromMsg(
+				(*(child_process_table+segv_fault_request_nid)).client_message);
 
 			// find corresponding Mem_Info_Node
 			struct Mem_Info_Node * mem_info_node = findMemInfoNode(shared_mem->min_head, fault_address);
@@ -524,6 +566,7 @@ int main(int argc , char *argv[]) {
 				return 1;				
 			}
 
+			// handle r&w fault
 			if (checkRecorderNidthBitIsSetToOne(&(mem_info_node->read_access), segv_fault_request_nid)){
 				/* write fault, at this stage there shouldn't be anyone has write-access, itself already
 				 have the read permission */
@@ -536,14 +579,39 @@ int main(int argc , char *argv[]) {
 				/* read fault */
 				/* first, revoke the write permission from other nodes */
 				if (mem_info_node->writer_nid != -1) {
+					memset((*(child_process_table + mem_info_node->writer_nid)).client_send_message, 
+						0, DATA_SIZE);
+					sprintf((*(child_process_table + mem_info_node->writer_nid)).client_send_message, 
+						"write_permission_revoke %p %p", 
+						mem_info_node->start_addr, mem_info_node->end_addr);
+					(*shared).allocator_wait_revoking_write_permission = 1;
+					kill((*(child_process_table + mem_info_node->writer_nid)).pid, SIGUSR1);
 
+					/* second, wait and get the content from other nodes, change writing permission */
+					while((*shared).allocator_wait_revoking_write_permission) {
+						sleep(0);
+					}
+										mem_info_node->writer_nid = -1;
 				}
-				/* second, get the content from other nodes */
-
 				/* third, set the read permission recorder, send the control info and content back to 
 				 requesting remote node */
-
+				setRecorderBitWithNid(&(mem_info_node->read_access), segv_fault_request_nid, 1);
+				memset((*(child_process_table + segv_fault_request_nid)).client_send_message, 
+						0, DATA_SIZE);
+				char header[100];
+				int send_data_size = (int)(mem_info_node->end_addr - mem_info_node->start_addr);
+				// do not omit the space in the message
+		        sprintf(header, "read_fault %p %d ", mem_info_node->start_addr, send_data_size); 
+		        sprintf((*(child_process_table + segv_fault_request_nid)).client_send_message, "%s", header);
+	
+		     
+		        memcpy((void *)((*(child_process_table + segv_fault_request_nid)).client_send_message+strlen(header)), 
+		        	mem_info_node->start_addr, send_data_size);
+		        // printf("~~~~~~~~~~~~~~%s\n", (*(child_process_table + segv_fault_request_nid)).client_send_message);
+		        kill((*(child_process_table + segv_fault_request_nid)).pid, SIGUSR1);
 			}
+
+			setRecorderBitWithNid(&((*shared).segv_fault_request), segv_fault_request_nid, 0);
 		}
 	}
 

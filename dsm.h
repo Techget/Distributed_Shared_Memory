@@ -15,7 +15,8 @@ typedef struct Shared{
 	char data_allocator_need_cp_to_send[DATA_SIZE];
 	int length_data_allocator_need_cp_to_send;
 	unsigned long sm_malloc_request; // bit-wise recorder, used to notify allocator about sm_malloc request
-	unsigned long segv_fault_request; // bit-wise recorder, used to notify allocator about sm_malloc request
+	unsigned long segv_fault_request; // bit-wise recorder, used to notify allocator about segv_fault request
+	int allocator_wait_revoking_write_permission;
 }Shared;
 
 struct child_process {
