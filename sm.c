@@ -19,6 +19,9 @@ static int node_id=-1;
 static char message[DATA_SIZE];
 static int message_set_flag = 0;
 
+#define WPR_MSG "write_permission_revoke"
+#define WI_MSG "write_invalidate"
+
 void sigio_handler (int signum, siginfo_t *si, void *ctx){
     char message_recv[DATA_SIZE];
     memset(message_recv, 0, DATA_SIZE);
@@ -31,11 +34,12 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx){
     int temp = recv(sock, message_recv, DATA_SIZE, 0);
 
     printf ("Node_id: %d, Caught a SIGIO.................Message: %s\n", node_id, message_recv);
-    if(strcmp(message_recv, "EXCEPTION")==0){
-        // process exception
-    }else{
+    if(strncmp(message_recv, WI_MSG, strlen(WI_MSG)) == 0) {
+
+    } else if(strncmp(message_recv, WPR_MSG, strlen(WPR_MSG)) == 0) {
+
+    } else {
         strcpy(message, message_recv);
-        // do not set message_set_flag when receive the write-invalidate
         message_set_flag = 1;
         debug_printf("set message_set_flag =1\n");
     }
@@ -81,7 +85,7 @@ void signaction_sigio_init(){
     memset( &sa, 0, sizeof(struct sigaction) );
     sigemptyset( &sa.sa_mask );
     sa.sa_sigaction = sigio_handler;
-    sa.sa_flags = SA_RESTART | SA_SIGINFO;
+    sa.sa_flags = SA_SIGINFO;
     sigaction( SIGIO, &sa, NULL );
     fcntl( sock, F_SETOWN, getpid() );
     // fcntl( sock, F_SETSIG, SIGIO );
@@ -118,7 +122,7 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
 
     node_id = *nid;
 
-    // signaction_segv_init();
+    signaction_segv_init();
     signaction_sigio_init();
     create_mmap(*nid);
 
@@ -144,7 +148,7 @@ void sm_barrier(void) {
 
     char message_send[DATA_SIZE], message_recv[DATA_SIZE];
     memset(message_send, 0, DATA_SIZE);
-    sprintf(message_send, "sm_barrier");
+    sprintf(message_send, SM_BARRIER_MSG);
     send(sock, message_send, strlen(message_send) , 0);
     //printf("client send message: %s\n", message);
 

@@ -9,6 +9,7 @@
 *	Common functions used in dsm and sm are defined in sm_util.h
 */
 #define DATA_SIZE 4096
+#define SM_BARRIER_MSG "sm_barrier"
 
 #ifdef DEBUG
 # define debug_printf(...) printf( __VA_ARGS__ );

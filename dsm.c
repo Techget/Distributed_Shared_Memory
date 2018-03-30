@@ -65,11 +65,11 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 	memset((*(child_process_table+nid)).client_message, 0,DATA_SIZE );
 	int num = recv((*(child_process_table+nid)).client_sock,
 		(*(child_process_table+nid)).client_message, DATA_SIZE, 0);
-	// printf("num: %d\n", num);
 	if (num == -1) {
         perror("recv");
         exit(1);
 	} else if (num == 0) {
+		// the tcp connection closed
 		(*(child_process_table+nid)).connected_flag = 0;
 		debug_printf("child process: %d, connection closed\n", nid);
 		return;
@@ -219,7 +219,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     		continue;
     	}
 
-		if(strcmp((*(child_process_table+node_n)).client_message, "sm_barrier")==0){
+		if(strcmp((*(child_process_table+node_n)).client_message, SM_BARRIER_MSG)==0){
 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
 			(*(child_process_table+node_n)).barrier_blocked = 1; // the order is important for these two statement
 			((*shared).barrier_counter)++;
