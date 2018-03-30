@@ -577,36 +577,44 @@ int main(int argc , char *argv[]) {
 
 				unsigned long num = mem_info_node->read_access;
 				debug_printf("read access: %p\n", num);
-				debug_printf("writer nid : %d\n", mem_info_node->writer_nid);
+				
+				debug_printf("request nid : %d\n",segv_fault_request_nid);
 				int bit;
 				
 				for(bit=0;bit<(sizeof(unsigned long) * 8); bit++){
-					// node with read access
-					if(num & 0x01){
-						debug_printf("Node: %d  ;read premission: %d\n", bit, num & 0x01);
-						
+					// do not send write invalidate message to requesting node
+					if(num & 0x01 && bit!=segv_fault_request_nid){
+						memset((*(child_process_table + bit)).client_send_message, 
+							0, DATA_SIZE);
+						sprintf((*(child_process_table + bit)).client_send_message, 
+							"write_invalidate %p %p", 
+							mem_info_node->start_addr, mem_info_node->end_addr);
 
-					/*
-					memset((*(child_process_table + mem_info_node->writer_nid)).client_send_message, 
-						0, DATA_SIZE);
-					sprintf((*(child_process_table + mem_info_node->writer_nid)).client_send_message, 
-						"write_invalidate %p %p", 
-						mem_info_node->start_addr, mem_info_node->end_addr);
-					(*shared).allocator_wait_revoking_write_permission = 1;
-					kill((*(child_process_table + mem_info_node->writer_nid)).pid, SIGUSR1);
-					*/
+						kill((*(child_process_table + bit)).pid, SIGUSR1);
 
-
+						// remove all read premission except for requesting node
+						setRecorderBitWithNid(&(mem_info_node->read_access), bit, 0);
 					}
-
 					num = num >> 1;
 				}
-
-
-
-
-
 				/* second, remove all the read permission, set the r&w permission for this requesting node */
+
+
+				// send message to requesting node and grant write premission
+				memset((*(child_process_table + segv_fault_request_nid)).client_send_message, 
+							0, DATA_SIZE);
+				sprintf((*(child_process_table + segv_fault_request_nid)).client_send_message, 
+							"write_grant %p %p", 
+						mem_info_node->start_addr, mem_info_node->end_addr);
+
+				kill((*(child_process_table + segv_fault_request_nid)).pid, SIGUSR1);
+
+				mem_info_node->writer_nid = segv_fault_request_nid;
+				debug_printf("writer nid set: %d\n", mem_info_node->writer_nid);
+
+
+
+
 
 			} else {
 				/* read fault */

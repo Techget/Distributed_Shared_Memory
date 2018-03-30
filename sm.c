@@ -22,6 +22,8 @@ static int message_set_flag = 0;
 
 #define WPR_MSG "write_permission_revoke"
 #define WI_MSG "write_invalidate"
+#define WG_MSG "write_grant"
+
 
 void sigio_handler (int signum, siginfo_t *si, void *ctx) {
     char message_recv[DATA_SIZE];
@@ -36,12 +38,11 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx) {
     printf ("Node_id: %d, Caught a SIGIO.................Message: %s\n", node_id, message_recv);
     if(strncmp(message_recv, WI_MSG, strlen(WI_MSG)) == 0) {
     	// receive write invalidate message
+    	debug_printf("Node_id: %d, receive write invalidate message\n", node_id);
         void * start_add = getFirstAddrFromMsg(message_recv);
         void * end_add = getSecondAddrFromMsg(message_recv);
         int size = (int)(end_add - start_add);
         mprotect(start_add, size, PROT_NONE);
-
-        
 
 
     } else if(strncmp(message_recv, WPR_MSG, strlen(WPR_MSG)) == 0) {
@@ -58,7 +59,15 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx) {
         sprintf(send_back_buffer, "%s", header);
         memcpy((void *)(send_back_buffer+strlen(header)), start_add, size);
         send(sock, send_back_buffer, size+strlen(header), 0);
-    } else {
+    } else if(strncmp(message_recv, WG_MSG, strlen(WG_MSG)) == 0) {
+    	debug_printf("Node_id: %d, receive write grant message\n", node_id);
+        void * start_add = getFirstAddrFromMsg(message_recv);
+        void * end_add = getSecondAddrFromMsg(message_recv);
+        int size = (int)(end_add - start_add);
+        mprotect(start_add, size, PROT_READ|PROT_WRITE);
+
+    }
+    else {
         memset(message, 0, DATA_SIZE);
         strcpy(message, message_recv);
         message_set_flag = 1;
