@@ -310,7 +310,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			}
 
  			// barrier in sm_bcast
- 			(*(child_process_table+node_n)).barrier_blocked = 1; // the sequence is import for these two statement
+ 			(*(child_process_table+node_n)).barrier_blocked = 1; // the sequence is important for these two statement
 			((*shared).barrier_counter)++;			
  			while((*(child_process_table+node_n)).barrier_blocked) {
  				sleep(0);
@@ -318,7 +318,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			debug_printf("child-process %d, after wait bcast\n",node_n);
 			send(client_sock,(*shared).data_allocator_need_cp_to_send, 
  				(*shared).length_data_allocator_need_cp_to_send,0);
- 			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
+ 			debug_printf("child-process %d, sm_bcast msg being sent: %s, Number of bytes sent: %zu\n",
  				node_n, (*shared).data_allocator_need_cp_to_send, 
  				(*shared).length_data_allocator_need_cp_to_send);
 
