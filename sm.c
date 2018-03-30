@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -7,6 +6,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
+#include <assert.h>
 
 #include "sm.h"
 #include "sm_mem.h"
@@ -14,20 +14,18 @@
 #define DEBUG
 #include "sm_util.h"
 
-
-
 static int sock = -1;
 static int node_id=-1;
-
-
 
 static char message[DATA_SIZE];
 static int message_set_flag = 0;
 
-void sigio_handler (int signum, siginfo_t *si, void *ctx){
+#define WPR_MSG "write_permission_revoke"
+#define WI_MSG "write_invalidate"
+
+void sigio_handler (int signum, siginfo_t *si, void *ctx) {
     char message_recv[DATA_SIZE];
     memset(message_recv, 0, DATA_SIZE);
-    memset(message, 0, DATA_SIZE);
     if (SIGIO != signum) {
         printf ("Panic!");
         exit (1);
@@ -35,68 +33,123 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx){
 
     int temp = recv(sock, message_recv, DATA_SIZE, 0);
 
-    printf ("Caught a SIGIO.................Message: %s\n", message_recv);
-    if(strcmp(message_recv, "EXCEPTION")==0){
-        // process exception
-    }else{
+    printf ("Node_id: %d, Caught a SIGIO.................Message: %s\n", node_id, message_recv);
+    if(strncmp(message_recv, WI_MSG, strlen(WI_MSG)) == 0) {
+
+    } else if(strncmp(message_recv, WPR_MSG, strlen(WPR_MSG)) == 0) {
+        void * start_add = getFirstAddrFromMsg(message_recv);
+        void * end_add = getSecondAddrFromMsg(message_recv);
+        int size = (int)(end_add - start_add);
+        mprotect(start_add, size, PROT_READ);
+
+        // send the content to allocator
+        char header[100];
+        sprintf(header, "retrieved_content %p %d ", start_add, size); // do not omit the space in the message
+        char * send_back_buffer = (char *)malloc(size + strlen(header));
+        sprintf(send_back_buffer, "%s", header);
+        memcpy((void *)(send_back_buffer+strlen(header)), start_add, size);
+        send(sock, send_back_buffer, size+strlen(header), 0);
+    } else {
+        memset(message, 0, DATA_SIZE);
         strcpy(message, message_recv);
         message_set_flag = 1;
         debug_printf("set message_set_flag =1\n");
     }
-
 }
 
 
-void segv_handler (int signum, siginfo_t *si, void *ctx){
-  void *addr;
+void segv_handler (int signum, siginfo_t *si, void *ctx) {
+    void *addr;
 
-  if (SIGSEGV != signum) {
-    printf ("Panic!");
-    exit (1);
-  }
-  addr = si->si_addr;         /* here we get the fault address */
+    if (SIGSEGV != signum) {
+        printf ("Panic!");
+        exit (1);
+    }
+    addr = si->si_addr; /* here we get the fault address */
 
     if (sock == -1) {
         printf("Run sm_node_init first\n");
         return;
     }
 
-    char message[DATA_SIZE];
+    char message_send[DATA_SIZE];
+    memset(message_send, 0, DATA_SIZE);
+    sprintf(message_send, "segv_fault %p", addr);
+    send(sock, message_send, strlen(message_send) , 0);
+
+    // wait for response, change to blocked mode temporarily
+    int opts;
+    opts = fcntl(sock,F_GETFL);
+    opts = opts & (~O_ASYNC);
+    opts = opts & (~O_NONBLOCK);
+    fcntl(sock,F_SETFL,opts);
+
     memset(message, 0, DATA_SIZE);
-    sprintf(message, "SEGV=%p", addr);
-    send(sock, message, strlen(message) , 0);
+    int temp = recv(sock, message, DATA_SIZE, 0);
 
+    if (strncmp(message, "read_fault", strlen("read_fault")) == 0) {
+        void * start_addr = getFirstAddrFromMsg(message);
+        int received_data_size = 0;
+        char * p = message;
+        int space_counter = 0;
+        while (*p) {
+            if (*p == ' ') {
+                space_counter += 1;
+                p++;
+                continue;
+            }
+            if (space_counter == 2) {
+                received_data_size = strtol(p, &p, 10);
+                continue;
+            }
+            if (space_counter == 3) {
+                break;
+            }
+            p++;
+        }
+        assert(received_data_size != 0);
+        assert(space_counter == 3);
+        // save the data to shared memory on allocator
+        mprotect(start_addr, received_data_size, PROT_READ|PROT_WRITE);
+        memcpy(start_addr, (void *)p, received_data_size);
+        mprotect(start_addr, received_data_size, PROT_READ);
+    } else if (strncmp(message, "write_fault", strlen("write_fault")) == 0) {
 
-    exit (0);
+    } else {
+        printf("remote node %d, receive unknown segv_fault reply: %s\n", node_id, message);
+    }
+
+    // change back to sigio
+    fcntl( sock, F_SETFL,  O_NONBLOCK |O_ASYNC );
 }
 
 /*
     Catch SEGV fault in client program
 */
-void signaction_segv_init(){
+void signaction_segv_init() {
     struct sigaction sa;
 
     sa.sa_sigaction = segv_handler;
     sa.sa_flags     = SA_SIGINFO;
     sigemptyset (&sa.sa_mask);
-    sigaction (SIGSEGV, &sa, NULL);       /* set the signal handler... */
 
+    // sigaddset(&sa.sa_mask, SIGIO);
+    // sigprocmask(SIG_UNBLOCK, &sa.sa_mask, NULL);
+
+    sigaction (SIGSEGV, &sa, NULL);       /* set the signal handler... */
 }
 
-void signaction_sigio_init(){
+void signaction_sigio_init() {
     struct sigaction sa;
     memset( &sa, 0, sizeof(struct sigaction) );
     sigemptyset( &sa.sa_mask );
     sa.sa_sigaction = sigio_handler;
-    sa.sa_flags = SA_RESTART | SA_SIGINFO;
+    sa.sa_flags = SA_SIGINFO|SA_NODEFER;
     sigaction( SIGIO, &sa, NULL );
     fcntl( sock, F_SETOWN, getpid() );
-    fcntl( sock, F_SETSIG, SIGIO );
-    fcntl( sock, F_SETFL, O_NONBLOCK | O_ASYNC );
-
+    // fcntl( sock, F_SETSIG, SIGIO );
+    fcntl( sock, F_SETFL,  O_NONBLOCK |O_ASYNC ); //O_NONBLOCK |
 }
-
-
 
 int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
     struct sockaddr_in server;
@@ -125,22 +178,19 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
     }
     (*argc) -= extra_arguments;
 
-
     node_id = *nid;
 
     signaction_segv_init();
-
     signaction_sigio_init();
-
     create_mmap(*nid);
 
     usleep(500000);// NOTICE: the reason to sleep is to wait child-process to setup the handler
         // otherwise, the sended message may be too early to trigger the SIGIO
-
     return 0;
 }
 
 void sm_node_exit(void) {
+    debug_printf("remote node %d call sm_node_exit\n", node_id);
     close(sock);
 }
 
@@ -155,18 +205,15 @@ void sm_barrier(void) {
         return;
     }
 
-    char message_send[DATA_SIZE], message_recv[DATA_SIZE];
+    char message_send[DATA_SIZE];
     memset(message_send, 0, DATA_SIZE);
-    sprintf(message_send, "sm_barrier");
+    sprintf(message_send, SM_BARRIER_MSG);
     send(sock, message_send, strlen(message_send) , 0);
-    //printf("client send message: %s\n", message);
 
     while(!message_set_flag){
         sleep(0);
     }
     message_set_flag = 0;
-    //memset(message_recv, 0, DATA_SIZE);
-    //int temp = recv(sock, message_recv, DATA_SIZE, 0);
     if(strcmp(message, message_send)!=0){
         printf("sm_barrier error\n");
         exit(0);
@@ -174,7 +221,8 @@ void sm_barrier(void) {
 }
 
 
-/* Allocate object of `size' byte in SM.
+/**
+ * Allocate object of `size' byte in SM.
  *
  * - Returns NULL if allocation failed.
  */
@@ -183,11 +231,11 @@ void *sm_malloc (size_t size){
         printf("Run sm_node_init first\n");
         return;
     }
-    char* alloc;
+    void* alloc;
 
-    char message_send[DATA_SIZE], message_recv[DATA_SIZE];
+    char message_send[DATA_SIZE];
     memset(message_send, 0, DATA_SIZE);
-    sprintf(message_send, "sm_malloc%d", size);
+    sprintf(message_send, "sm_malloc %d", size);
     send(sock, message_send, strlen(message_send) , 0);
 
     //memset(message_recv, 0, DATA_SIZE);
@@ -197,7 +245,14 @@ void *sm_malloc (size_t size){
     }
     message_set_flag = 0;
 
-    alloc = (char*)strtol(message, NULL, 10);
+    alloc = (void*)strtoul(message, NULL, 16);
+
+    if (alloc == (void *)INVALID_MALLOC_ADDR) {
+        return NULL;
+    }
+
+    debug_printf("remote node %d receive sm_malloc address: %p\n", node_id, alloc);
+    mprotect(alloc, size, PROT_READ|PROT_WRITE);
 
     return alloc;
 }
@@ -215,32 +270,29 @@ void sm_bcast (void **addr, int root_nid){
         printf("Run sm_node_init first\n");
         return;
     }
-    int address;
-    char message_send[DATA_SIZE], message_recv[DATA_SIZE];
+    void * address;
+    char message_send[DATA_SIZE];
     memset(message_send, 0, DATA_SIZE);
 
     if(root_nid == node_id){
-        sprintf(message_send, "sm_bcast%d", *addr);
+        sprintf(message_send, "sm_bcast %p", *addr);
         send(sock, message_send, strlen(message_send) , 0);
         debug_printf("node %d: send sm_bcast with addr: %p\n", node_id, *addr);
     }else{
-        sprintf(message_send, "sm_bcast%d", 0);
+        sprintf(message_send, "sm_bcast_need_sync", 0);
         send(sock, message_send, strlen(message_send) , 0);
-        debug_printf("node %d: send sm_bcast with addr: 0\n", node_id);
+        debug_printf("node %d: send sm_bcast request, need to sync the address\n", node_id);
     }
-    //memset(message_recv, 0, DATA_SIZE);
-    //int temp = recv(sock, message_recv, DATA_SIZE, 0);
-    
+
     while(!message_set_flag){
         sleep(0);
     }
     message_set_flag = 0;
 
-    address = (int)strtol(message, NULL, 10);
+    address = (void *)strtoul(message, NULL, 16); 
     debug_printf("node %d: receive sm_bcast addr: %p\n", node_id, address);
 
     if(root_nid != node_id){
-        *addr = (void*)address;
+        *addr = address;
     }
-
 }

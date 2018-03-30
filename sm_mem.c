@@ -1,38 +1,37 @@
 #include "sm_mem.h"
 
-#define ADDR_BASE 0xe7500000
-#define PAGE_NUM 0x100
-
-
 void* create_mmap(int pid){
   int i;
-  char *address, *alloc;
+  void *address, *alloc;
   long bytes;
   int prot;
   unsigned char arr[20];
 
-  address = (char*)malloc(sizeof(char));
-  address = (char*)ADDR_BASE;
+  // address = (char*)malloc(sizeof(char));
+  address = (void *)ADDR_BASE;
 
   bytes = getpagesize()*PAGE_NUM;
 
+  int flags;
 
-  if(pid = -1){ // allow full access in allocator
+  if(pid == -1){ // allow full access in allocator
     prot = PROT_READ | PROT_WRITE;
+    flags = MAP_FIXED | MAP_ANONYMOUS| MAP_SHARED;
   }else{        // no w/r access in client
     prot = PROT_NONE;
+    flags = MAP_ANONYMOUS|MAP_PRIVATE | MAP_FIXED;
   }
 
-  alloc = mmap(address, bytes,prot ,
-                     MAP_ANON | MAP_SHARED| MAP_FIXED, 0, 0);
+  // change to use 'prot' later
+  alloc = mmap(address, bytes, prot , flags, 0, 0);
 
   if (alloc == MAP_FAILED) {
     perror("mmap failed.....................................");
     exit(0);
   }
 
-  printf("node %d: ..................addr after mmap: 0x%x\n",pid, address);
-  printf("node %d: ............................alloc: 0x%x\n",pid, alloc);
+  printf("node %d: ..................addr after mmap: %p\n",pid, address);
+  printf("node %d: ............................alloc: %p\n",pid, alloc);
 
   return alloc;
 }
