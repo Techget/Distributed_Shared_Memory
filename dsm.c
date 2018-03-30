@@ -525,24 +525,23 @@ int main(int argc , char *argv[]) {
 			}
 
 			if (checkRecorderNidthBitIsSetToOne(&(mem_info_node->read_access), segv_fault_request_nid)){
-				// write fault, at this stage there shouldn't be anyone has write-access, itself already
-				// have the read permission
+				/* write fault, at this stage there shouldn't be anyone has write-access, itself already
+				 have the read permission */
 				assert(mem_info_node->writer_nid == -1);
+				/* first, send out write-invalidate message to remote node who is reading this memory */
 
-				// first, send out write-invalidate message to remote node who is reading this memory
-
-				// second, remove all the read permission, set the r&w permission for this requesting node
+				/* second, remove all the read permission, set the r&w permission for this requesting node */
 
 			} else {
-				// read fault
-				// first, revoke the write permission from other nodes
+				/* read fault */
+				/* first, revoke the write permission from other nodes */
 				if (mem_info_node->writer_nid != -1) {
 
 				}
-				// second, get the content from other nodes
+				/* second, get the content from other nodes */
 
-				// third, set the read permission recorder, send the control info and content back to 
-				// requesting remote node
+				/* third, set the read permission recorder, send the control info and content back to 
+				 requesting remote node */
 
 			}
 		}
