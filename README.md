@@ -1,29 +1,53 @@
 # Distributed Shared Memory Design
 
 ## System Structure
-The Distributed Shared Memory is build around three different components:
+The Distributed Shared Memory is mainly build around three components:
 
-* the Allocator process the arguments, creation of child process and allocate shared region for synchronization between child processes.
+* Allocator process the arguments, creation of child process and allocate shared region for synchronization between child processes. After the client started, it would manage and record the memory allocation and useage of the shared memory region.
 
-* the Child processes are forked from the allocator, each child process will manage connection and communication between the corresponding client program. It mamages ssh and TCP connection with client program. 
+* Child processes are forked from the allocator prior to the creation of shared memory, child process manages connection and data transfer with its corresponding client program, they also communicate with allocator through shared data.
 
-* Client program interfaces are functions invoked by the client programs. 
-
+* Client program interfaces contain functions that can be invoked by the client programs. It includes ```sm_node_init```, ```sm_node_exit```, ```sm_barrier```, ```sm_malloc```, ```sm_bcast```.
 
 
 ## Allocator Design
 
 ### Argument processing
-Argument processing is achieved using getopt
+Argument processing is achieved by using getopt
 
-### Create shared region for synchronization
-The child processes are synchronised using Semaphore, it is used when client invokes ```sm_barrier()```, child processes need to wait for each other to execute this function and continue together. 
+### Create shared region for synchronization and data passing
+There are three structs used in shared region: ```Shared```, ```child_process``` and ```Shared_Mem```:
+#### Shared
+Stores important data about current state of processing and notifies child processes about different requests.
 
-In order to start together, a table of all child Pid is also shared for sending singal to start process.
+#### child_process
+Stores data about child process, it is implemented as a table in dsm.c as each child process would have its own information stored. It includes process id, message received and sent, flag to indicate current states.
+
+#### Shared_Mem
+struct used to record distributed shared memory, it contains informations about the size of shared memory, pointer for allocation, and also a linked list of ```Mem_Info_Node```, which records the start and end address, read and write access of each allocation.
+
 
 ### Creation of child process
 
-Child processes are forked from the allocator, 
+Child processes are forked from the allocator, the child process executes function ```childProcessMain```. It will be discussed later.
+
+### Allocator start to work
+Allocator takes the role to process requests about shared memory operation and synchronization, it communicates with child process using shared data and signal
+
+#### Processing sm_barrier and sm_bcast
+A shared counter is used to record how many clients has sent message to the allocator. After all clients has sent message to the allocator, which means they have executed to the same point, messages will be sent back to allow the processes continue to execute.
+In ```sm_bcast```, the shared memory address will be sent back instead.
+
+#### Processing sm_malloc
+When a client sends message for sm_malloc, the corresponding child process will pass its information to the allocator. Allocator would find the next available region in the distributed shared memory and create a new ```Mem_Info_Node``` to store its information, at its point, only the requesting client will have read and write permission to this region. Allocator would send the allocated address back to the client.
+
+#### Processing write fault
+It happens when a client attempts to write a protected memory. The fault handler will try to handle this by requesting permission from allocator. After receiving the message, allocator would send write-invalidate message to the clients who is reading this memory. The reading premission would be revoked from these clients, also, records on the allocator would be changed as well. 
+Then allocator will grant the write premission by sending a massage back to the requesting client. 
+
+#### Processing read fault
+It happens when a client attempts to read a protected memory. The fault handler will send a request to the allocator. After receiving this message, the client with write permission would be revoked, this client would also send transfer the latest contents of the requested page back to the allocator, as it knows the actual data on that region. 
+Allocator would then grant read permission to the requesting client and send the page content to it.
 
 ## Child Process Design
 
