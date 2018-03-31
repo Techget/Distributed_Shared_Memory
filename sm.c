@@ -35,8 +35,14 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx) {
 
     printf ("Node_id: %d, Caught a SIGIO.................Message: %s\n", node_id, message_recv);
     if(strncmp(message_recv, WI_MSG, strlen(WI_MSG)) == 0) {
-
+        // receive write invalidate message
+        debug_printf("Node_id: %d, receive write invalidate message\n", node_id);
+        void * start_add = getFirstAddrFromMsg(message_recv);
+        void * end_add = getSecondAddrFromMsg(message_recv);
+        int size = (int)(end_add - start_add);
+        mprotect(start_add, size, PROT_NONE);
     } else if(strncmp(message_recv, WPR_MSG, strlen(WPR_MSG)) == 0) {
+        // receive write_permission_revoke
         void * start_add = getFirstAddrFromMsg(message_recv);
         void * end_add = getSecondAddrFromMsg(message_recv);
         int size = (int)(end_add - start_add);
@@ -119,11 +125,13 @@ void segv_handler (int signum, siginfo_t *si, void *ctx) {
         memcpy(start_addr, (void *)p, received_data_size);
         mprotect(start_addr, received_data_size, PROT_READ);
     } else if (strncmp(message, "write_fault", strlen("write_fault")) == 0) {
-
+        void * start_add = getFirstAddrFromMsg(message_recv);
+        void * end_add = getSecondAddrFromMsg(message_recv);
+        int size = (int)(end_add - start_add);
+        mprotect(start_add, size, PROT_READ|PROT_WRITE);
     } else {
         printf("remote node %d, receive unknown segv_fault reply: %s\n", node_id, message);
     }
-
     // change back to sigio
     // fcntl( sock, F_SETFL,  O_NONBLOCK |O_ASYNC );
 }

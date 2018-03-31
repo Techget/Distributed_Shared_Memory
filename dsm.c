@@ -103,7 +103,6 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
     memset(message_recv, 0, DATA_SIZE);
 
 	int num = recv((*(child_process_table+nid)).client_sock, message_recv, DATA_SIZE, 0);
-	// printf("~~~~~~~~%s~~~~%d\n", message_recv, strncmp(message_recv, "retrieved_content", strlen("retrieved_content")));
 
 	if (num == -1) {
         perror("recv");
@@ -144,6 +143,7 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 		// unblock allocator, the write permission will be modified in allocator
 		(*shared).allocator_wait_revoking_write_permission = 0;	
 	} else {
+		// leave the message for later processing
 		memset((*(child_process_table+nid)).client_message, 0,DATA_SIZE );
 		strcpy((*(child_process_table+nid)).client_message, message_recv);
 		(*(child_process_table+nid)).message_received_flag++;
@@ -572,9 +572,33 @@ int main(int argc , char *argv[]) {
 				 have the read permission */
 				assert(mem_info_node->writer_nid == -1);
 				/* first, send out write-invalidate message to remote node who is reading this memory */
-
-				/* second, remove all the read permission, set the r&w permission for this requesting node */
-
+				unsigned long num = mem_info_node->read_access;
+				int bit;
+				
+				for(bit=0;bit<(sizeof(unsigned long) * 8); bit++){
+					// do not send write-invalidate message to requesting node
+					if(num & 0x01 && bit!=segv_fault_request_nid){
+						memset((*(child_process_table + bit)).client_send_message, 
+							0, DATA_SIZE);
+						sprintf((*(child_process_table + bit)).client_send_message, 
+							"write_invalidate %p %p", 
+							mem_info_node->start_addr, mem_info_node->end_addr);
+						kill((*(child_process_table + bit)).pid, SIGUSR1);
+						// remove all read premission except for requesting node
+						setRecorderBitWithNid(&(mem_info_node->read_access), bit, 0);
+					}
+					num = num >> 1;
+				}
+				/* second, set the r&w permission for this requesting node, and send message to requesting node*/
+				// // send message to requesting node and grant write premission
+				memset((*(child_process_table + segv_fault_request_nid)).client_send_message, 
+							0, DATA_SIZE);
+				sprintf((*(child_process_table + segv_fault_request_nid)).client_send_message, 
+							"write_fault %p %p", 
+						mem_info_node->start_addr, mem_info_node->end_addr);
+				kill((*(child_process_table + segv_fault_request_nid)).pid, SIGUSR1);
+				mem_info_node->writer_nid = segv_fault_request_nid;
+				debug_printf("writer nid set: %d\n", mem_info_node->writer_nid);
 			} else {
 				/* read fault */
 				/* first, revoke the write permission from other nodes */
