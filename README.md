@@ -1,11 +1,11 @@
 # Distributed Shared Memory Design
 
 ## System Structure
-The Distributed Shared Memory is build around three different components:
+The Distributed Shared Memory is mainly build around three components:
 
-* the Allocator process the arguments, creation of child process and allocate shared region for synchronization between child processes.
+* Allocator process the arguments, creation of child process and allocate shared region for synchronization between child processes. After the client started, it would manage and record the memory allocation and useage of the shared memory region.
 
-* the Child processes are forked from the allocator, each child process will manage connection and communication between the corresponding client program. It mamages ssh and TCP connection with client program. 
+* Child processes are forked from the allocator prior to the creation of shared memory, child process will manage connection and data transfer between its corresponding client program.
 
 * Client program interfaces are functions invoked by the client programs. 
 
