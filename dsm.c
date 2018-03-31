@@ -273,7 +273,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			debug_printf("child-process %d, start process sm_barrier\n", node_n);
 			(*(child_process_table+node_n)).barrier_blocked = 1; // the order is important for these two statement
 			((*shared).barrier_counter)++;
-			debug_printf("(*shared).barrier_counter: %d\n",(*shared).barrier_counter);
+			debug_printf("child-process: %d (*shared).barrier_counter: %d\n", node_n, (*shared).barrier_counter);
 			while((*(child_process_table+node_n)).barrier_blocked) {
 				sleep(0);
 			}
