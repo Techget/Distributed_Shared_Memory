@@ -125,6 +125,8 @@ void segv_handler (int signum, siginfo_t *si, void *ctx) {
         memcpy(start_addr, (void *)p, received_data_size);
         mprotect(start_addr, received_data_size, PROT_READ);
     } else if (strncmp(message, "write_fault", strlen("write_fault")) == 0) {
+	printf("remote node: %d receive write_fault: %s\n", node_id, message);
+	// fflush(stdout);
         void * start_add = getFirstAddrFromMsg(message);
         void * end_add = getSecondAddrFromMsg(message);
         int size = (int)(end_add - start_add);
