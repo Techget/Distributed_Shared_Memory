@@ -39,10 +39,15 @@ A shared counter is used to record how many clients has sent message to the allo
 In ```sm_bcast```, the shared memory address will be sent back instead.
 
 #### Processing sm_malloc
-When a client sends message of sm_malloc, the corresponding child process will 
+When a client sends message for sm_malloc, the corresponding child process will pass its information to the allocator. Allocator would find the next available region in the distributed shared memory and create a new ```Mem_Info_Node``` to store its information, at its point, only the requesting client will have read and write permission to this region. Allocator would send the allocated address back to the client.
 
+#### Processing write fault
+It happens when a client attempts to write a protected memory. The fault handler will try to handle this by requesting permission from allocator. After receiving the message, allocator would send write-invalidate message to the clients who is reading this memory. The reading premission would be revoked from these clients, also, records on the allocator would be changed as well. 
+Then allocator will grant the write premission by sending a massage back to the requesting client. 
 
-
+#### Processing read fault
+It happens when a client attempts to read a protected memory. The fault handler will send a request to the allocator. After receiving this message, the client with write permission would be revoked, this client would also send transfer the latest contents of the requested page back to the allocator, as it knows the actual data on that region. 
+Allocator would then grant read permission to the requesting client and send the page content to it.
 
 ## Child Process Design
 
