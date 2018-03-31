@@ -87,3 +87,6 @@ The client interface contains functions ```sm_node_init```, ```sm_node_exit```, 
 * ```sm_barrier``` send a TCP message to child process, it will have to wait for the child process to send a message back to signal that all client programs has reached this function, then it can continue.
 * ```sm_malloc``` 
 * ```sm_bcast``` 
+
+* ```sigio_handler```
+* ```segv_handler```
