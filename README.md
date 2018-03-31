@@ -24,7 +24,7 @@ Stores important data about current state of processing and notifies child proce
 Stores data about child process, it is implemented as a table in dsm.c as each child process would have its own information stored. It includes process id, message received and sent, flag to indicate current states.
 
 #### Shared_Mem
-struct used to record distributed shared memory
+struct used to record distributed shared memory, it contains informations about the size of shared memory, pointer for allocation, and also a linked list of ```Mem_Info_Node```, which records the start and end address, read and write access of each allocation.
 
 
 ### Creation of child process
