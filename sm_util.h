@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 /**
 *	Common functions used in dsm and sm are defined in sm_util.h
 */

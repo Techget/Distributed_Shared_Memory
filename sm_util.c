@@ -9,9 +9,10 @@ void setRecorderBitWithNid(unsigned long * recorder, int nid, int val) {
 }
 
 int recorderFindNidSetToOne(unsigned long * recorder) {
-	int temp = (*recorder) ^ ((*recorder) & ((*recorder)-1));
-	temp -= 1; // to restore to nid;
-	return temp;
+	// int temp = (*recorder) ^ ((*recorder) & ((*recorder)-1));
+	// temp -= 1; // to restore to nid;
+	// return temp;
+   return log2(*(recorder) & (-(*recorder)))+1;
 }
 
 int checkRecorderNidthBitIsSetToOne(unsigned long * recorder, int nid) {
