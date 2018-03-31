@@ -13,12 +13,19 @@ The Distributed Shared Memory is mainly build around three components:
 ## Allocator Design
 
 ### Argument processing
-Argument processing is achieved using getopt
+Argument processing is achieved by using getopt
 
-### Create shared region for synchronization
-The child processes are synchronised using Semaphore, it is used when client invokes ```sm_barrier()```, child processes need to wait for each other to execute this function and continue together. 
+### Create shared region for synchronization and data passing
+There are three structs used in shared region: ```Shared```, ```child_process``` and ```Shared_Mem```:
+#### Shared
+Stores important data about current state of processing and notifies child processes about different requests.
 
-In order to start together, a table of all child Pid is also shared for sending singal to start process.
+#### child_process
+Stores data about child process, it is implemented as a table in dsm.c as each child process would have its own information stored. It includes process id, message received and sent, flag to indicate current states.
+
+#### Shared_Mem
+struct used to record distributed shared memory
+
 
 ### Creation of child process
 
