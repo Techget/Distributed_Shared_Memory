@@ -5,10 +5,9 @@ The Distributed Shared Memory is mainly build around three components:
 
 * Allocator process the arguments, creation of child process and allocate shared region for synchronization between child processes. After the client started, it would manage and record the memory allocation and useage of the shared memory region.
 
-* Child processes are forked from the allocator prior to the creation of shared memory, child process will manage connection and data transfer between its corresponding client program.
+* Child processes are forked from the allocator prior to the creation of shared memory, child process manages connection and data transfer with its corresponding client program, they also communicate with allocator through shared data.
 
-* Client program interfaces are functions invoked by the client programs. 
-
+* Client program interfaces contain functions that can be invoked by the client programs. It includes ```sm_node_init```, ```sm_node_exit```, ```sm_barrier```, ```sm_malloc```, ```sm_bcast```.
 
 
 ## Allocator Design
