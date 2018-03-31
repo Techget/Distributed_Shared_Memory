@@ -114,7 +114,7 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 		return;
 	} else if (strncmp(message_recv, "retrieved_content", strlen("retrieved_content")) == 0) {
 		// !!!!!REMEMBER to deal with case where data is larger than defined DATA_SIZE
-		printf("child process: %d, get retrieved_content: %s\n", nid, message_recv);
+		printf("child process: %d, get retrieved_content: %s~~~\n", nid, message_recv);
 		void * start_addr = getFirstAddrFromMsg(message_recv);
 		int received_data_size = 0;
 		char * p = message_recv;
@@ -138,8 +138,7 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 		assert(space_counter == 3);
 		// save the data to shared memory on allocator
 		memcpy(start_addr, (void *)p, received_data_size);
-		// printf("~~~~~~~~%p check it is written: %c~~~\n", start_addr, *((char *)start_addr));
-		msync(start_addr, received_data_size, MS_SYNC);
+		// msync(start_addr, received_data_size, MS_SYNC);
 		// unblock allocator, the write permission will be modified in allocator
 		(*shared).allocator_wait_revoking_write_permission = 0;	
 	} else {
@@ -280,7 +279,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 			debug_printf("child-process %d, after wait\n",node_n);
 			send(client_sock,(*(child_process_table+node_n)).client_message, 
 				strlen((*(child_process_table+node_n)).client_message),0);
-			debug_printf("child-process %d, msg being sent: %s, Number of bytes sent: %zu\n",
+			debug_printf("child-process %d, sm_barrier msg being sent: %s, Number of bytes sent: %zu\n",
 				node_n, (*(child_process_table+node_n)).client_message, 
 				strlen((*(child_process_table+node_n)).client_message));
 
@@ -297,7 +296,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 				(*(child_process_table+node_n)).sm_mallocated_address);
  			send(client_sock,(*(child_process_table+node_n)).client_message, 
  				strlen((*(child_process_table+node_n)).client_message),0);
-			debug_printf("child-process %d, msg being sent: %s, addr: 0x%x,  Number of bytes sent: %zu\n",
+			debug_printf("child-process %d, sm_malloc msg being sent: %s, addr: 0x%x,  Number of bytes sent: %zu\n",
 				node_n, (*(child_process_table+node_n)).client_message, 
 				(*(child_process_table+node_n)).sm_mallocated_address, 
 				strlen((*(child_process_table+node_n)).client_message));
@@ -324,6 +323,11 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "segv_fault", strlen("segv_fault"))==0){
 			debug_printf("child-process %d, receive segv_fault\n", node_n);
+			while((*shared).segv_fault_request > 0) {
+				sleep(0); // kind of queueing the segv_fault, and during segv_fault handling, it can be certain that
+						// no other message will be recevied except `retrieved-content` infos that user-unaware
+						// it helps to process the segv_fault request in FIFO order.
+			}
 			setRecorderBitWithNid(&((*shared).segv_fault_request), node_n, 1);
 			// leave everything else to allocator
 		}else {
