@@ -12,7 +12,7 @@ int recorderFindNidSetToOne(unsigned long * recorder) {
 	// int temp = (*recorder) ^ ((*recorder) & ((*recorder)-1));
 	// temp -= 1; // to restore to nid;
 	// return temp;
-        int temp = log2(*(recorder) & (-(*recorder)));
+    int temp = log2(*(recorder) & (-(*recorder)));
 	return temp;
 }
 
