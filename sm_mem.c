@@ -18,7 +18,7 @@ void* create_mmap(int pid){
     prot = PROT_READ | PROT_WRITE;
     flags = MAP_FIXED | MAP_ANONYMOUS| MAP_SHARED;
   }else{        // no w/r access in client
-    prot = 0;
+    prot = PROT_NONE;
     flags = MAP_ANONYMOUS|MAP_PRIVATE | MAP_FIXED;
   }
 
