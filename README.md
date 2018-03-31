@@ -29,7 +29,20 @@ struct used to record distributed shared memory, it contains informations about 
 
 ### Creation of child process
 
-Child processes are forked from the allocator, 
+Child processes are forked from the allocator, the child process executes function ```childProcessMain```. It will be discussed later.
+
+### Allocator start to work
+Allocator takes the role to process requests about shared memory operation and synchronization, it communicates with child process using shared data and signal
+
+#### Processing sm_barrier and sm_bcast
+A shared counter is used to record how many clients has sent message to the allocator. After all clients has sent message to the allocator, which means they have executed to the same point, messages will be sent back to allow the processes continue to execute.
+In ```sm_bcast```, the shared memory address will be sent back instead.
+
+#### Processing sm_malloc
+When a client sends message of sm_malloc, the corresponding child process will 
+
+
+
 
 ## Child Process Design
 
