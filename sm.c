@@ -125,8 +125,8 @@ void segv_handler (int signum, siginfo_t *si, void *ctx) {
         memcpy(start_addr, (void *)p, received_data_size);
         mprotect(start_addr, received_data_size, PROT_READ);
     } else if (strncmp(message, "write_fault", strlen("write_fault")) == 0) {
-        void * start_add = getFirstAddrFromMsg(message_recv);
-        void * end_add = getSecondAddrFromMsg(message_recv);
+        void * start_add = getFirstAddrFromMsg(message);
+        void * end_add = getSecondAddrFromMsg(message);
         int size = (int)(end_add - start_add);
         mprotect(start_add, size, PROT_READ|PROT_WRITE);
     } else {
