@@ -69,29 +69,6 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx) {
         message_set_flag = 1;
         debug_printf("set message_set_flag =1\n");
     }
-
-    // if(strncmp(message_recv, WI_MSG, strlen(WI_MSG)) == 0) {
-    //     // receive write invalidate message
-    //     debug_printf("Node_id: %d, receive write invalidate message\n", node_id);
-    //     void * start_add = getFirstAddrFromMsg(message_recv);
-    //     void * end_addr = getSecondAddrFromMsg(message_recv);
-    //     int size = (int)(end_addr - start_add);
-    //     mprotect(start_add, size, PROT_NONE);
-    // } else if(strncmp(message_recv, WPR_MSG, strlen(WPR_MSG)) == 0) {
-    //     // receive write_permission_revoke
-    //     void * start_add = getFirstAddrFromMsg(message_recv);
-    //     void * end_add = getSecondAddrFromMsg(message_recv);
-    //     int size = (int)(end_add - start_add);
-    //     mprotect(start_add, size, PROT_READ);
-
-    //     // send the content to allocator
-    //     char header[100];
-    //     sprintf(header, "retrieved_content %p %d ", start_add, size); // do not omit the space in the message
-    //     char * send_back_buffer = (char *)malloc(size + strlen(header));
-    //     sprintf(send_back_buffer, "%s", header);
-    //     memcpy((void *)(send_back_buffer+strlen(header)), start_add, size);
-    //     send(sock, send_back_buffer, size+strlen(header), 0);
-    // } 
 }
 
 
@@ -224,6 +201,7 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
 
 void sm_node_exit(void) {
     debug_printf("remote node %d call sm_node_exit\n", node_id);
+    usleep(500000); // wait all node process finish, in case some of them still need to process segv_fault
     close(sock);
 }
 

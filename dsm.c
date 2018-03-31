@@ -599,9 +599,10 @@ int main(int argc , char *argv[]) {
 				sprintf((*(child_process_table + segv_fault_request_nid)).client_send_message, 
 							"write_fault %p %p", 
 						mem_info_node->start_addr, mem_info_node->end_addr);
-				kill((*(child_process_table + segv_fault_request_nid)).pid, SIGUSR1);
 				mem_info_node->writer_nid = segv_fault_request_nid;
 				debug_printf("writer nid set: %d\n", mem_info_node->writer_nid);
+				setRecorderBitWithNid(&((*shared).segv_fault_request), segv_fault_request_nid, 0);
+				kill((*(child_process_table + segv_fault_request_nid)).pid, SIGUSR1);
 			} else {
 				/* read fault */
 				/* first, revoke the write permission from other nodes */
@@ -633,10 +634,9 @@ int main(int argc , char *argv[]) {
 		        memcpy((void *)((*(child_process_table + segv_fault_request_nid)).client_send_message+strlen(header)), 
 		        	mem_info_node->start_addr, send_data_size);
 		        // notify the child process to reply to segv_fault remote node
+		        setRecorderBitWithNid(&((*shared).segv_fault_request), segv_fault_request_nid, 0);
 		        kill((*(child_process_table + segv_fault_request_nid)).pid, SIGUSR1);
 			}
-
-			setRecorderBitWithNid(&((*shared).segv_fault_request), segv_fault_request_nid, 0);
 		}
 	}
 
