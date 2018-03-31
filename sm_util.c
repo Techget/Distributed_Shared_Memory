@@ -103,6 +103,11 @@ void * getPageBaseOfAddr(void * addr) {
 	return page_base;
 }
 
+void removeSubstring(char *s, char *toremove) {
+	while( s=strstr(s,toremove) ) {
+		memmove(s,s+strlen(toremove),1+strlen(s+strlen(toremove)));
+	}
+}
 /* Extract oct number from string 
 	decode message with digit and '-' only, unable to decode hex
 */

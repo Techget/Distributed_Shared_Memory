@@ -590,7 +590,6 @@ int main(int argc , char *argv[]) {
 					num = num >> 1;
 				}
 				/* second, set the r&w permission for this requesting node, and send message to requesting node*/
-				// // send message to requesting node and grant write premission
 				memset((*(child_process_table + segv_fault_request_nid)).client_send_message, 
 							0, DATA_SIZE);
 				sprintf((*(child_process_table + segv_fault_request_nid)).client_send_message, 

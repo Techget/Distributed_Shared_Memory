@@ -35,4 +35,5 @@ void * getSecondAddrFromMsg(char * client_message);
 
 void * getPageBaseOfAddr(void * addr);
 int log2_64(uint64_t n);
+void removeSubstring(char *s, char *toremove);
 #endif

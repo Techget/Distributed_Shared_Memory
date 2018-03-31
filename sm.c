@@ -25,42 +25,73 @@ static int message_set_flag = 0;
 
 void sigio_handler (int signum, siginfo_t *si, void *ctx) {
     char message_recv[DATA_SIZE];
-    memset(message_recv, 0, DATA_SIZE);
+    
     if (SIGIO != signum) {
         printf ("Panic!");
         exit (1);
     }
-
+    memset(message_recv, 0, DATA_SIZE);
     int temp = recv(sock, message_recv, DATA_SIZE, 0);
 
     printf ("Node_id: %d, Caught a SIGIO.................Message: %s\n", node_id, message_recv);
-    if(strncmp(message_recv, WI_MSG, strlen(WI_MSG)) == 0) {
-        // receive write invalidate message
-        debug_printf("Node_id: %d, receive write invalidate message\n", node_id);
-        void * start_add = getFirstAddrFromMsg(message_recv);
-        void * end_add = getSecondAddrFromMsg(message_recv);
-        int size = (int)(end_add - start_add);
+
+    if(strstr(message_recv, WI_MSG) != NULL) {
+        char * start = strstr(message_recv, WI_MSG);
+        void * start_add = getFirstAddrFromMsg(start);
+        void * end_addr = getSecondAddrFromMsg(start);
+        int size = (int)(end_addr - start_add);
         mprotect(start_add, size, PROT_NONE);
-    } else if(strncmp(message_recv, WPR_MSG, strlen(WPR_MSG)) == 0) {
-        // receive write_permission_revoke
-        void * start_add = getFirstAddrFromMsg(message_recv);
-        void * end_add = getSecondAddrFromMsg(message_recv);
-        int size = (int)(end_add - start_add);
+        char temp[100];
+        sprintf(temp, "%s %p %p",WI_MSG, start_add, end_addr);
+        removeSubstring(message_recv, temp);
+    }
+    if(strstr(message_recv, WPR_MSG) != NULL) {
+        char * start = strstr(message_recv, WPR_MSG);
+        void * start_add = getFirstAddrFromMsg(start);
+        void * end_addr = getSecondAddrFromMsg(start);
+        int size = (int)(end_addr - start_add);
         mprotect(start_add, size, PROT_READ);
 
-        // send the content to allocator
         char header[100];
         sprintf(header, "retrieved_content %p %d ", start_add, size); // do not omit the space in the message
         char * send_back_buffer = (char *)malloc(size + strlen(header));
         sprintf(send_back_buffer, "%s", header);
         memcpy((void *)(send_back_buffer+strlen(header)), start_add, size);
         send(sock, send_back_buffer, size+strlen(header), 0);
-    } else {
+
+        char temp[100];
+        sprintf(temp, "%s %p %p",WPR_MSG, start_add, end_addr);
+        removeSubstring(message_recv, temp);
+    }
+    if (strlen(message_recv) > 0) {
         memset(message, 0, DATA_SIZE);
         strcpy(message, message_recv);
         message_set_flag = 1;
         debug_printf("set message_set_flag =1\n");
     }
+
+    // if(strncmp(message_recv, WI_MSG, strlen(WI_MSG)) == 0) {
+    //     // receive write invalidate message
+    //     debug_printf("Node_id: %d, receive write invalidate message\n", node_id);
+    //     void * start_add = getFirstAddrFromMsg(message_recv);
+    //     void * end_addr = getSecondAddrFromMsg(message_recv);
+    //     int size = (int)(end_addr - start_add);
+    //     mprotect(start_add, size, PROT_NONE);
+    // } else if(strncmp(message_recv, WPR_MSG, strlen(WPR_MSG)) == 0) {
+    //     // receive write_permission_revoke
+    //     void * start_add = getFirstAddrFromMsg(message_recv);
+    //     void * end_add = getSecondAddrFromMsg(message_recv);
+    //     int size = (int)(end_add - start_add);
+    //     mprotect(start_add, size, PROT_READ);
+
+    //     // send the content to allocator
+    //     char header[100];
+    //     sprintf(header, "retrieved_content %p %d ", start_add, size); // do not omit the space in the message
+    //     char * send_back_buffer = (char *)malloc(size + strlen(header));
+    //     sprintf(send_back_buffer, "%s", header);
+    //     memcpy((void *)(send_back_buffer+strlen(header)), start_add, size);
+    //     send(sock, send_back_buffer, size+strlen(header), 0);
+    // } 
 }
 
 
@@ -84,15 +115,6 @@ void segv_handler (int signum, siginfo_t *si, void *ctx) {
     send(sock, message_send, strlen(message_send) , 0);
 
     // wait for response, change to blocked mode temporarily
-    // int opts;
-    // opts = fcntl(sock,F_GETFL);
-    // opts = opts & (~O_ASYNC);
-    // opts = opts & (~O_NONBLOCK);
-    // fcntl(sock,F_SETFL,opts);
-
-    // memset(message, 0, DATA_SIZE);
-    // int temp = recv(sock, message, DATA_SIZE, 0);
-
     while(!message_set_flag){
         sleep(0);
     }
@@ -125,8 +147,8 @@ void segv_handler (int signum, siginfo_t *si, void *ctx) {
         memcpy(start_addr, (void *)p, received_data_size);
         mprotect(start_addr, received_data_size, PROT_READ);
     } else if (strncmp(message, "write_fault", strlen("write_fault")) == 0) {
-	printf("remote node: %d receive write_fault: %s\n", node_id, message);
-	// fflush(stdout);
+    	printf("remote node: %d receive write_fault: %s\n", node_id, message);
+    	// fflush(stdout);
         void * start_add = getFirstAddrFromMsg(message);
         void * end_add = getSecondAddrFromMsg(message);
         int size = (int)(end_add - start_add);
@@ -134,8 +156,6 @@ void segv_handler (int signum, siginfo_t *si, void *ctx) {
     } else {
         printf("remote node %d, receive unknown segv_fault reply: %s\n", node_id, message);
     }
-    // change back to sigio
-    // fcntl( sock, F_SETFL,  O_NONBLOCK |O_ASYNC );
 }
 
 /*
@@ -147,10 +167,6 @@ void signaction_segv_init() {
     sa.sa_sigaction = segv_handler;
     sa.sa_flags     = SA_SIGINFO;
     sigemptyset (&sa.sa_mask);
-
-    // sigaddset(&sa.sa_mask, SIGIO);
-    // sigprocmask(SIG_UNBLOCK, &sa.sa_mask, NULL);
-
     sigaction (SIGSEGV, &sa, NULL);       /* set the signal handler... */
 }
 
@@ -188,10 +204,12 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
     // clean up the extra information
     int i = 1;
     int extra_arguments = 4;
+
     for (i = 1; i+extra_arguments<(*argc)-1; i++) {
         (*argv)[i] = (*argv)[i+4];
     }
-    (*argc) -= extra_arguments;
+    (*argv)[i] = NULL;
+    (*argc) -= extra_arguments+1;
 
     node_id = *nid;
 
@@ -230,7 +248,7 @@ void sm_barrier(void) {
     }
     message_set_flag = 0;
     if(strcmp(message, message_send)!=0){
-        printf("sm_barrier error\n");
+        printf("sm_barrier error, message: %s, message_send: %s\n", message, message_send);
         exit(0);
     }
 }
