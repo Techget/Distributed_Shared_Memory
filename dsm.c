@@ -601,6 +601,8 @@ int main(int argc , char *argv[]) {
 						mem_info_node->start_addr, mem_info_node->end_addr);
 				mem_info_node->writer_nid = segv_fault_request_nid;
 				debug_printf("writer nid set: %d\n", mem_info_node->writer_nid);
+				assert(checkRecorderNidthBitIsSetToOne(&(mem_info_node->read_access), segv_fault_request_nid)==1);
+				// restore the segv_fault_request
 				setRecorderBitWithNid(&((*shared).segv_fault_request), segv_fault_request_nid, 0);
 				kill((*(child_process_table + segv_fault_request_nid)).pid, SIGUSR1);
 			} else {

@@ -152,7 +152,7 @@ void signaction_sigio_init() {
     memset( &sa, 0, sizeof(struct sigaction) );
     sigemptyset( &sa.sa_mask );
     sa.sa_sigaction = sigio_handler;
-    sa.sa_flags = SA_SIGINFO|SA_NODEFER;
+    sa.sa_flags = SA_SIGINFO|SA_RESTART;
     sigaction( SIGIO, &sa, NULL );
     fcntl( sock, F_SETOWN, getpid() );
     // fcntl( sock, F_SETSIG, SIGIO );
