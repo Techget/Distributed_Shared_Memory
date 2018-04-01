@@ -57,8 +57,13 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx) {
         sprintf(header, "retrieved_content %p %d ", start_add, size); // do not omit the space in the message
         char * send_back_buffer = (char *)malloc(size + strlen(header));
         sprintf(send_back_buffer, "%s", header);
-        memcpy((void *)(send_back_buffer+strlen(header)), start_add, size);
-        printf("remote node %d send retrieved_content: %s~~\n", node_id, send_back_buffer);
+        memmove((void *)(send_back_buffer+strlen(header)), start_add, size);
+        printf("remote node %d send retrieved_content: %s~~\n", node_id, send_back_buffer);	
+	//int i = 0;
+	//while(i<288) {
+	//	printf("%02X",(unsigned) *(send_back_buffer+strlen(header)+i));
+	//}
+
         send(sock, send_back_buffer, size+strlen(header), 0);
 
         char temp[100];
