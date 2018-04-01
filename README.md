@@ -82,11 +82,23 @@ The child process simply receive the message and leaves it to the allocator for 
 ## Client Interface Design
 The client interface contains functions ```sm_node_init```, ```sm_node_exit```, ```sm_barrier```, ```sm_malloc```, ```sm_bcast```, it would also handle segmentation fault of the client program. The TCP connection is also asynchronised. 
 
-* ```sm_node_init``` will start the TCP connection between client program and child process.
-* ```sm_node_exit``` closes the TCP connection.
-* ```sm_barrier``` send a TCP message to child process, it will have to wait for the child process to send a message back to signal that all client programs has reached this function, then it can continue.
-* ```sm_malloc``` 
-* ```sm_bcast``` 
+### sm_node_init 
+it starts the TCP connection with child process in asynchronised mode, then initializes segmentation fault handler and SIGIO handler. It would create a shared memory region with the same address space as the allocator.
+### sm_node_exit
+Closes the TCP connection.
+### sm_barrier
+Sends a TCP message to child process, client program will not be able to continue execuate until it gets a message from child process to signal that all client programs has reached this point. 
+### sm_malloc
+Sends a TCP message to allocator and ask for address, allocator will find the next available space from the shared memory and send its address back to the client program. Client program requesting the space has read and write access to it.
+### sm_bcast
+Root node will send the address that needs to be broadcasted, other nodes will send the request for synchronization. Allocator will take the address from root node and send it back to others. The root will also get a message simultaneously so that all nodes continue execution at the same time.
+### sigio_handler
+It handles TCP message receive, there are three types of message:
+#### write_invalidate
+Message from allocator to revoke the read permission from client. The protection of the memory region would be set to ```PROT_NONE```.
+#### write_permission_revoke
+Message from allocator to revoke the write permission, it is assumed that only one client has write permission. So it should have the latest data in the requested region. After receiving the message, the node only has read permission, its data in that region will be transfered to the allocator.
+#### other message
 
-* ```sigio_handler```
-* ```segv_handler```
+
+### segv_handler
