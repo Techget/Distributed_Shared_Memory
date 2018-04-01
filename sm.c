@@ -41,6 +41,7 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx) {
         void * end_addr = getSecondAddrFromMsg(start);
         int size = (int)(end_addr - start_add);
         mprotect(start_add, size, PROT_NONE);
+
         char temp[100];
         sprintf(temp, "%s %p %p",WI_MSG, start_add, end_addr);
         removeSubstring(message_recv, temp);
@@ -57,6 +58,7 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx) {
         char * send_back_buffer = (char *)malloc(size + strlen(header));
         sprintf(send_back_buffer, "%s", header);
         memcpy((void *)(send_back_buffer+strlen(header)), start_add, size);
+        printf("remote node %d send retrieved_content: %s~~\n", node_id, send_back_buffer);
         send(sock, send_back_buffer, size+strlen(header), 0);
 
         char temp[100];
