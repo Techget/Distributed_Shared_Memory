@@ -254,12 +254,12 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
     memset( &sa, 0, sizeof(struct sigaction) );
     sigemptyset( &sa.sa_mask );
     sa.sa_sigaction = child_process_SIGIO_handler;
-    sa.sa_flags = SA_SIGINFO;
+    sa.sa_flags = SA_SIGINFO|SA_RESTART;
     sigaction( SIGIO, &sa, NULL );
 
     struct sigaction sa2;
 	sa2.sa_sigaction = child_process_SIGUSR1_handler;
-	sa2.sa_flags     = SA_SIGINFO;
+	sa2.sa_flags     = SA_SIGINFO|SA_RESTART;
 	sigemptyset (&sa2.sa_mask);
 	sigaction (SIGUSR1, &sa2, NULL);
 

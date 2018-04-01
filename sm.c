@@ -142,7 +142,7 @@ void signaction_segv_init() {
     struct sigaction sa;
 
     sa.sa_sigaction = segv_handler;
-    sa.sa_flags     = SA_SIGINFO;
+    sa.sa_flags     = SA_SIGINFO|SA_RESTART;
     sigemptyset (&sa.sa_mask);
     sigaction (SIGSEGV, &sa, NULL);       /* set the signal handler... */
 }
