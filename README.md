@@ -99,6 +99,10 @@ Message from allocator to revoke the read permission from client. The protection
 #### write_permission_revoke
 Message from allocator to revoke the write permission, it is assumed that only one client has write permission. So it should have the latest data in the requested region. After receiving the message, the node only has read permission, its data in that region will be transfered to the allocator.
 #### other message
-
-
+Other message are synchronised messages in the functions, it is achieved by setting a flag. client process has to wait until it set to read the message.
 ### segv_handler
+When a Segmentation fault occurs in the client process, the handler will send a message with its address back to the allocator. From the permission records on the allocator, it is able to decide whether it is read fault or write fault. 
+#### read fault
+The client wants to read the memory region, allocator will send the latest page to it. Client then saves the page to its own memory and gets read permission.
+#### write fault
+The client wants to write the memory region, after allocator settles other things, it receives the message and get the write permission.
