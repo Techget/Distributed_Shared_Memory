@@ -45,7 +45,13 @@ void write_to_log(const char * s) {
 }
 
 void cleanUpMemInfoNodes(struct Mem_Info_Node * head) {
-
+    struct Mem_Info_Node * temp = head;
+ 
+    while(temp!=NULL) {
+        struct Mem_Info_Node * temp2 = temp->next;
+        munmap(temp, sizeof(struct Mem_Info_Node));
+        temp = temp2;
+    }
 }
 
 void cleanUp(int n_processes) {
@@ -81,8 +87,40 @@ void child_process_SIGUSR1_handler(int signum, siginfo_t *si, void *ctx) {
 	}
 
 	debug_printf("child process %d, SIGUSR1, sending message %s\n", nid, (*(child_process_table+nid)).client_send_message);
-	send((*(child_process_table+nid)).client_sock,(*(child_process_table+nid)).client_send_message, 	
-		strlen((*(child_process_table+nid)).client_send_message), 0);
+	
+	if (strstr((*(child_process_table+nid)).client_send_message, "read_fault") != NULL) {
+        // this part is poor designed
+        void * start_addr = getFirstAddrFromMsg((*(child_process_table+nid)).client_send_message);
+        int received_data_size = 0;
+        char * p = (*(child_process_table+nid)).client_send_message;
+        int space_counter = 0;
+        while (*p) {
+            if (*p == ' ') {
+                space_counter += 1;
+                p++;
+                continue;
+            }
+            if (space_counter == 2) {
+                received_data_size = strtol(p, &p, 10);
+                continue;
+            }
+            if (space_counter == 3) {
+                break;
+            }
+            p++;
+        }
+        char temp[100];
+        sprintf(temp, "read_fault %p %d ", start_addr, received_data_size);
+        send((*(child_process_table+nid)).client_sock,(*(child_process_table+nid)).client_send_message,        
+            strlen(temp) + received_data_size, 0);
+    } else {
+        send((*(child_process_table+nid)).client_sock,(*(child_process_table+nid)).client_send_message,         
+            strlen((*(child_process_table+nid)).client_send_message), 0);
+    }       
+    memset((*(child_process_table+nid)).client_send_message, 0, DATA_SIZE);
+
+	// send((*(child_process_table+nid)).client_sock,(*(child_process_table+nid)).client_send_message, 	
+	// 	strlen((*(child_process_table+nid)).client_send_message), 0);
 }
 
 void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
