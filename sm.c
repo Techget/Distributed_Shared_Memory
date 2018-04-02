@@ -72,7 +72,8 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx) {
     }
     if (strlen(message_recv) > 0) {
         memset(message, 0, DATA_SIZE);
-        strcpy(message, message_recv);
+        // this won't work for read fault
+        memmove((void *)message, (void *)message_recv, DATA_SIZE);
         message_set_flag = 1;
         debug_printf("set message_set_flag =1\n");
     }
