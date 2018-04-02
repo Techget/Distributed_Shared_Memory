@@ -89,7 +89,7 @@ void child_process_SIGUSR1_handler(int signum, siginfo_t *si, void *ctx) {
 	debug_printf("child process %d, SIGUSR1, sending message %s\n", nid, (*(child_process_table+nid)).client_send_message);
 	
 	if (strstr((*(child_process_table+nid)).client_send_message, "read_fault") != NULL) {
-        // this part is poor designed
+        // this part is bloody poor designed, should revise it when have time
         void * start_addr = getFirstAddrFromMsg((*(child_process_table+nid)).client_send_message);
         int received_data_size = 0;
         char * p = (*(child_process_table+nid)).client_send_message;
@@ -118,9 +118,6 @@ void child_process_SIGUSR1_handler(int signum, siginfo_t *si, void *ctx) {
             strlen((*(child_process_table+nid)).client_send_message), 0);
     }       
     memset((*(child_process_table+nid)).client_send_message, 0, DATA_SIZE);
-
-	// send((*(child_process_table+nid)).client_sock,(*(child_process_table+nid)).client_send_message, 	
-	// 	strlen((*(child_process_table+nid)).client_send_message), 0);
 }
 
 void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
@@ -182,7 +179,7 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 	} else {
 		// leave the message for later processing
 		memset((*(child_process_table+nid)).client_message, 0,DATA_SIZE );
-		strcpy((*(child_process_table+nid)).client_message, message_recv);
+ 		strcpy((*(child_process_table+nid)).client_message, message_recv);
 		(*(child_process_table+nid)).message_received_flag++;
 		debug_printf("child-process %d, msg Received %s\n", nid,
 			(*(child_process_table+nid)).client_message);
@@ -385,7 +382,9 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
 
 
-/*
+/**
+*	Allocator Main Function
+*
 * 	Connection model basically as following:
 *		allocator <---> (child process <---> remote node)+
 *

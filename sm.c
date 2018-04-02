@@ -59,11 +59,6 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx) {
         sprintf(send_back_buffer, "%s", header);
         memmove((void *)(send_back_buffer+strlen(header)), start_add, size);
         printf("remote node %d send retrieved_content: %s~~\n", node_id, send_back_buffer);	
-	//int i = 0;
-	//while(i<288) {
-	//	printf("%02X",(unsigned) *(send_back_buffer+strlen(header)+i));
-	//}
-
         send(sock, send_back_buffer, size+strlen(header), 0);
 
         char temp[100];
@@ -72,7 +67,6 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx) {
     }
     if (strlen(message_recv) > 0) {
         memset(message, 0, DATA_SIZE);
-        // this won't work for read fault
         memmove((void *)message, (void *)message_recv, DATA_SIZE);
         message_set_flag = 1;
         debug_printf("set message_set_flag =1\n");
