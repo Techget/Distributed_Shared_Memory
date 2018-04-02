@@ -17,6 +17,9 @@ typedef struct Shared{
 	unsigned long sm_malloc_request; // bit-wise recorder, used to notify allocator about sm_malloc request
 	unsigned long segv_fault_request; // bit-wise recorder, used to notify allocator about segv_fault request
 	int allocator_wait_revoking_write_permission;
+	pthread_mutex_t queue_mutex;
+	pthread_mutexattr_t queue_mutex_attr;
+	struct Queue * segv_fault_queue;
 }Shared;
 
 struct child_process {

@@ -9,6 +9,7 @@ struct Queue
 };
 
 struct Queue* createQueue(unsigned capacity);
+void destroyQueue(struct Queue * queue);
 int isFull(struct Queue* queue); 
 int isEmpty(struct Queue* queue);
 void enqueue(struct Queue* queue, int item);

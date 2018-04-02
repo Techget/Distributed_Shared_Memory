@@ -12,6 +12,13 @@ struct Queue* createQueue(unsigned capacity)
     queue->array = (int*) malloc(queue->capacity * sizeof(int));
     return queue;
 }
+
+
+void destroyQueue(struct Queue * queue) {
+    free(queue->array);
+    free(queue);
+}
+
  
 // Queue is full when size becomes equal to the capacity 
 int isFull(struct Queue* queue)

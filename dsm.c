@@ -19,9 +19,11 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <assert.h>
+#include <pthread.h>
 
 #include "dsm.h"
 #include "sm_mem.h"
+#include "queue.h"
 
 #define DEBUG  // define DEBUG before sm_util.h
 #include "sm_util.h"
@@ -59,7 +61,10 @@ void cleanUp(int n_processes) {
 		fclose(log_file_fp);
 	}
 
+	pthread_mutex_destroy(&(shared->queue_mutex));
+	pthread_mutexattr_destroy(&((*shared).queue_mutex_attr)); 
 	munmap(shared, sizeof(struct Shared));
+
 	munmap(child_process_table, n_processes * sizeof(struct child_process));
 	munmap(shared_mem->allocator_shared_memory_start_address, (*shared_mem).shared_memory_size);
 	cleanUpMemInfoNodes(shared_mem->min_head);
@@ -495,6 +500,10 @@ int main(int argc , char *argv[]) {
 	(*shared).sm_malloc_request = 0;
 	(*shared).segv_fault_request = 0;
 	(*shared).allocator_wait_revoking_write_permission = 0;
+	pthread_mutexattr_init(&((*shared).queue_mutex_attr));
+	pthread_mutexattr_setpshared(&((*shared).queue_mutex_attr), PTHREAD_PROCESS_SHARED);
+	pthread_mutex_init(&(shared->queue_mutex), &((*shared).queue_mutex_attr));
+	(*shared).segv_fault_queue = createQueue(64);
 
 	child_process_table = (struct child_process *)mmap(NULL, sizeof(struct child_process)*n_processes, 
 		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
