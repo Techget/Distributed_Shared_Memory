@@ -203,7 +203,9 @@ int sm_node_init (int *argc, char **argv[], int *nodes, int *nid) {
 
 void sm_node_exit(void) {
     debug_printf("remote node %d call sm_node_exit\n", node_id);
-    usleep(500000); // wait all node process finish, in case some of them still need to process segv_fault
+    // usleep(500000); // wait all node process finish, in case some of them still need to process segv_fault
+    // sleep(1);
+    sm_barrier(); // ensure nodes quit together
     close(sock);
 }
 
