@@ -106,3 +106,9 @@ When a Segmentation fault occurs in the client process, the handler will send a 
 The client wants to read the memory region, allocator will send the latest page to it. Client then saves the page to its own memory and gets read permission.
 #### write fault
 The client wants to write the memory region, after allocator settles other things, it receives the message and get the write permission.
+
+
+## Problems exists
+### Memory Fragmentation
+`mprotect` needs the address to be page-based, so every newly sm_allocated memory, needs to start on a new page
+
