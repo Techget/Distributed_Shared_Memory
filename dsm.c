@@ -147,12 +147,16 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 		(*(child_process_table+nid)).connected_flag = 0;
 		debug_printf("child process: %d, connection closed\n", nid);
 		return;
-	} else if (strncmp(message_recv, "retrieved_content", strlen("retrieved_content")) == 0) {
+	} 
+
+	// need to take care of cases where two messages received together, retrieved_content and other msgs
+	// especially retrieved_content + sm_barrier, that's the reason it gets blocked sometime.
+	if (strstr(message_recv, "retrieved_content") != NULL) {
 		// !!!!!REMEMBER to deal with case where data is larger than defined DATA_SIZE
 		printf("child process: %d, get retrieved_content: %s~~~\n", nid, message_recv);
-		void * start_addr = getFirstAddrFromMsg(message_recv);
+		char * p = strstr(message_recv, "retrieved_content");
+		void * start_addr = getFirstAddrFromMsg(p);
 		int received_data_size = 0;
-		char * p = message_recv;
 		int space_counter = 0;
 		while (*p) {
 			if (*p == ' ') {
@@ -173,12 +177,32 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 		assert(space_counter == 3);
 		// save the data to shared memory on allocator
 		memcpy(start_addr, (void *)p, received_data_size);
-		// msync(start_addr, received_data_size, MS_SYNC);
+
+
+		// char header[100];
+		// sprintf(header, "retrieved_content %p %d ", start_addr, received_data_size);
+		// p = strstr(message_recv, "retrieved_content");
+		// if(p == message_recv) {
+		// 	p += (strlen(header) + received_data_size);
+		//     memcpy(message_recv, p, strlen(p));
+		// } else {
+		//     *p = 0;
+		// }
+		if (strstr(message_recv, "sm_barrier")) {
+			sprintf(message_recv, "sm_barrier", strlen("sm_barrier"));
+		} else {
+			memset(message_recv, 0, DATA_SIZE);
+		}
+
 		// unblock allocator, the write permission will be modified in allocator
 		(*shared).allocator_wait_revoking_write_permission = 0;	
-	} else {
+	} 
+
+	if (strlen(message_recv) > 0) {
 		// leave the message for later processing
 		memset((*(child_process_table+nid)).client_message, 0,DATA_SIZE );
+		// be careful for this sentence, since it only handle strings, however in this case, it works, different
+		// from the case in sm.c
  		strcpy((*(child_process_table+nid)).client_message, message_recv);
 		(*(child_process_table+nid)).message_received_flag++;
 		debug_printf("child-process %d, msg Received %s\n", nid,
