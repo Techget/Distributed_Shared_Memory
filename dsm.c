@@ -387,12 +387,19 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "segv_fault", strlen("segv_fault"))==0){
 			debug_printf("child-process %d, receive segv_fault\n", node_n);
-			while((*shared).segv_fault_request > 0) {
-				sleep(0); // kind of queueing the segv_fault, and during segv_fault handling, it can be certain that
-						// no other message will be recevied except `retrieved-content` infos that user-unaware
-						// it helps to process the segv_fault request in FIFO order.
-			}
-			setRecorderBitWithNid(&((*shared).segv_fault_request), node_n, 1);
+			// while((*shared).segv_fault_request > 0) {
+			// 	sleep(0); // kind of queueing the segv_fault, and during segv_fault handling, it can be certain that
+			// 			// no other message will be recevied except `retrieved-content` infos that user-unaware
+			// 			// it helps to process the segv_fault request in FIFO order.
+			// }
+			// setRecorderBitWithNid(&((*shared).segv_fault_request), node_n, 1);
+			pthread_mutex_lock(&(shared->queue_mutex));
+			// enqueue(shared->segv_fault_queue, node_n);
+			shared->segv_fault_queue->rear = (shared->segv_fault_queue->rear + 1)%(shared->segv_fault_queue->capacity);
+		    shared->segv_fault_queue->array[shared->segv_fault_queue->rear] = node_n;
+		    shared->segv_fault_queue->size = shared->segv_fault_queue->size + 1;
+			debug_printf("add %d to segv_fault_queue\n", node_n);
+			pthread_mutex_unlock(&(shared->queue_mutex));
 			// leave everything else to allocator
 		}else {
 			printf("!!!!!!!!Child-process %d receive Unknown msg: %s\n", node_n,
@@ -503,7 +510,13 @@ int main(int argc , char *argv[]) {
 	pthread_mutexattr_init(&((*shared).queue_mutex_attr));
 	pthread_mutexattr_setpshared(&((*shared).queue_mutex_attr), PTHREAD_PROCESS_SHARED);
 	pthread_mutex_init(&(shared->queue_mutex), &((*shared).queue_mutex_attr));
-	(*shared).segv_fault_queue = createQueue(64);
+	(*shared).segv_fault_queue = (struct Queue *)mmap(NULL, sizeof(struct Queue), 
+		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	(*shared).segv_fault_queue->capacity = 64;
+    (*shared).segv_fault_queue->front = (*shared).segv_fault_queue->size = 0; 
+    (*shared).segv_fault_queue->rear = (*shared).segv_fault_queue->capacity - 1;
+    (*shared).segv_fault_queue->array = (int*) mmap(NULL, sizeof(int)*64, 
+		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 	child_process_table = (struct child_process *)mmap(NULL, sizeof(struct child_process)*n_processes, 
 		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
@@ -627,8 +640,16 @@ int main(int argc , char *argv[]) {
 			setRecorderBitWithNid(&((*shared).sm_malloc_request), sm_malloc_request_nid, 0);
 		} 
 		/* segv fault */
-		else if ((*shared).segv_fault_request > 0) { 
-			int segv_fault_request_nid = recorderFindNidSetToOne(&((*shared).segv_fault_request));
+		// else if ((*shared).segv_fault_request > 0) {
+		else if (!isEmpty(shared->segv_fault_queue)) { 
+			pthread_mutex_lock(&(shared->queue_mutex));
+			// int segv_fault_request_nid = dequeue(shared->segv_fault_queue);
+			int segv_fault_request_nid = shared->segv_fault_queue->array[shared->segv_fault_queue->front];
+    		shared->segv_fault_queue->front = (shared->segv_fault_queue->front + 1)%(shared->segv_fault_queue->capacity);
+    		shared->segv_fault_queue->size = shared->segv_fault_queue->size - 1;
+			debug_printf("allocator dequeue get %d\n", segv_fault_request_nid);
+			pthread_mutex_unlock(&(shared->queue_mutex));
+			// int segv_fault_request_nid = recorderFindNidSetToOne(&((*shared).segv_fault_request));
 			void * fault_address = getFirstAddrFromMsg(
 				(*(child_process_table+segv_fault_request_nid)).client_message);
 
@@ -652,6 +673,9 @@ int main(int argc , char *argv[]) {
 				for(bit=0;bit<(sizeof(unsigned long) * 8); bit++){
 					// do not send write-invalidate message to requesting node
 					if(num & 0x01 && bit!=segv_fault_request_nid){
+						while(strlen((*(child_process_table + bit)).client_send_message) > 0) {
+							sleep(0);
+						}
 						memset((*(child_process_table + bit)).client_send_message, 
 							0, DATA_SIZE);
 						sprintf((*(child_process_table + bit)).client_send_message, 
@@ -664,6 +688,9 @@ int main(int argc , char *argv[]) {
 					num = num >> 1;
 				}
 				/* second, set the r&w permission for this requesting node, and send message to requesting node*/
+				while(strlen((*(child_process_table + segv_fault_request_nid)).client_send_message) > 0) {
+					sleep(0);
+				}
 				memset((*(child_process_table + segv_fault_request_nid)).client_send_message, 
 							0, DATA_SIZE);
 				sprintf((*(child_process_table + segv_fault_request_nid)).client_send_message, 
@@ -673,12 +700,16 @@ int main(int argc , char *argv[]) {
 				debug_printf("writer nid set: %d\n", mem_info_node->writer_nid);
 				assert(checkRecorderNidthBitIsSetToOne(&(mem_info_node->read_access), segv_fault_request_nid)==1);
 				// restore the segv_fault_request
-				setRecorderBitWithNid(&((*shared).segv_fault_request), segv_fault_request_nid, 0);
+				// setRecorderBitWithNid(&((*shared).segv_fault_request), segv_fault_request_nid, 0);
 				kill((*(child_process_table + segv_fault_request_nid)).pid, SIGUSR1);
 			} else {
 				/* read fault */
 				/* first, revoke the write permission from other nodes */
 				if (mem_info_node->writer_nid != -1) {
+					while(strlen((*(child_process_table + mem_info_node->writer_nid)).client_send_message) > 0){
+						sleep(0);
+					}
+
 					memset((*(child_process_table + mem_info_node->writer_nid)).client_send_message, 
 						0, DATA_SIZE);
 					sprintf((*(child_process_table + mem_info_node->writer_nid)).client_send_message, 
@@ -696,6 +727,10 @@ int main(int argc , char *argv[]) {
 				/* third, set the read permission recorder, send the control info and content back to 
 				 requesting remote node */
 				setRecorderBitWithNid(&(mem_info_node->read_access), segv_fault_request_nid, 1);
+				while(strlen((*(child_process_table + segv_fault_request_nid)).client_send_message) > 0) {
+					sleep(0);
+				}
+
 				memset((*(child_process_table + segv_fault_request_nid)).client_send_message, 
 						0, DATA_SIZE);
 				char header[100];
@@ -706,7 +741,7 @@ int main(int argc , char *argv[]) {
 		        memcpy((void *)((*(child_process_table + segv_fault_request_nid)).client_send_message+strlen(header)), 
 		        	mem_info_node->start_addr, send_data_size);
 		        // notify the child process to reply to segv_fault remote node
-		        setRecorderBitWithNid(&((*shared).segv_fault_request), segv_fault_request_nid, 0);
+		        // setRecorderBitWithNid(&((*shared).segv_fault_request), segv_fault_request_nid, 0);
 		        kill((*(child_process_table + segv_fault_request_nid)).pid, SIGUSR1);
 			}
 		}
