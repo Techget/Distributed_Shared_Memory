@@ -63,6 +63,7 @@ void cleanUp(int n_processes) {
 
 	pthread_mutex_destroy(&(shared->queue_mutex));
 	pthread_mutexattr_destroy(&((*shared).queue_mutex_attr)); 
+	destroyQueue(shared->segv_fault_queue);
 	munmap(shared, sizeof(struct Shared));
 
 	munmap(child_process_table, n_processes * sizeof(struct child_process));
@@ -387,14 +388,9 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
 
 		}else if(strncmp((*(child_process_table+node_n)).client_message, "segv_fault", strlen("segv_fault"))==0){
 			debug_printf("child-process %d, receive segv_fault\n", node_n);
-			// while((*shared).segv_fault_request > 0) {
-			// 	sleep(0); // kind of queueing the segv_fault, and during segv_fault handling, it can be certain that
-			// 			// no other message will be recevied except `retrieved-content` infos that user-unaware
-			// 			// it helps to process the segv_fault request in FIFO order.
-			// }
-			// setRecorderBitWithNid(&((*shared).segv_fault_request), node_n, 1);
 			pthread_mutex_lock(&(shared->queue_mutex));
-			// enqueue(shared->segv_fault_queue, node_n);
+			// try to call enqueue(shared->segv_fault_queue, node_n), but it does not actually write to
+			// the memory, so implement the enqueue function here.
 			shared->segv_fault_queue->rear = (shared->segv_fault_queue->rear + 1)%(shared->segv_fault_queue->capacity);
 		    shared->segv_fault_queue->array[shared->segv_fault_queue->rear] = node_n;
 		    shared->segv_fault_queue->size = shared->segv_fault_queue->size + 1;

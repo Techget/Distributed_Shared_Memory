@@ -15,8 +15,8 @@ struct Queue* createQueue(unsigned capacity)
 
 
 void destroyQueue(struct Queue * queue) {
-    free(queue->array);
-    free(queue);
+    munmap(queue->array, queue->capacity);
+    munmap(queue);
 }
 
  
