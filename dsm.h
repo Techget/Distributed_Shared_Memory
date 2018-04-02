@@ -1,7 +1,7 @@
 #ifndef	_DSM_H
 #define	_DSM_H
 
-#define DATA_SIZE 4096
+#define DATA_SIZE 4096 * 3
 // NOTICE! for bit-wise op, need to increase nid by 1 when doing it, 
 // since pid start from 0 instead of 1
 

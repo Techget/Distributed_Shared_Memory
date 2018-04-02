@@ -10,7 +10,7 @@
 /**
 *	Common functions used in dsm and sm are defined in sm_util.h
 */
-#define DATA_SIZE 4096
+#define DATA_SIZE 4096 * 3
 #define SM_BARRIER_MSG "sm_barrier"
 #define RETRIEVED_CONTENT_MSG "retrieved_content"
 
