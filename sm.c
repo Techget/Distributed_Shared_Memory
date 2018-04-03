@@ -11,7 +11,7 @@
 #include "sm.h"
 #include "sm_mem.h"
 
-#define DEBUG
+// #define DEBUG
 #include "sm_util.h"
 
 static int sock = -1;
@@ -33,7 +33,7 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx) {
     memset(message_recv, 0, DATA_SIZE);
     int temp = recv(sock, message_recv, DATA_SIZE, 0);
 
-    printf ("Node_id: %d, Caught a SIGIO.................Message: %s\n", node_id, message_recv);
+    debug_printf ("Node_id: %d, Caught a SIGIO.................Message: %s\n", node_id, message_recv);
 
     if(strstr(message_recv, WI_MSG) != NULL) {
         char * start = strstr(message_recv, WI_MSG);
@@ -58,7 +58,7 @@ void sigio_handler (int signum, siginfo_t *si, void *ctx) {
         char * send_back_buffer = (char *)malloc(size + strlen(header));
         sprintf(send_back_buffer, "%s", header);
         memmove((void *)(send_back_buffer+strlen(header)), start_add, size);
-        printf("remote node %d send retrieved_content: %s~~\n", node_id, send_back_buffer);	
+        debug_printf("remote node %d send retrieved_content: %s~~\n", node_id, send_back_buffer);	
         send(sock, send_back_buffer, size+strlen(header), 0);
 
         char temp[100];
@@ -126,7 +126,7 @@ void segv_handler (int signum, siginfo_t *si, void *ctx) {
         memcpy(start_addr, (void *)p, received_data_size);
         mprotect(start_addr, received_data_size, PROT_READ);
     } else if (strncmp(message, "write_fault", strlen("write_fault")) == 0) {
-    	printf("remote node: %d receive write_fault: %s\n", node_id, message);
+    	debug_printf("remote node: %d receive write_fault: %s\n", node_id, message);
     	// fflush(stdout);
         void * start_add = getFirstAddrFromMsg(message);
         void * end_add = getSecondAddrFromMsg(message);

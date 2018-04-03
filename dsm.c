@@ -25,7 +25,7 @@
 #include "sm_mem.h"
 #include "queue.h"
 
-#define DEBUG  // define DEBUG before sm_util.h
+// #define DEBUG  // define DEBUG before sm_util.h
 #include "sm_util.h"
 
 #define PORT_BASE 10000
@@ -159,7 +159,7 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 	// especially retrieved_content + sm_barrier, that's the reason it gets blocked sometime.
 	if (strstr(message_recv, "retrieved_content") != NULL) {
 		// !!!!!REMEMBER to deal with case where data is larger than defined DATA_SIZE
-		printf("child process: %d, get retrieved_content: %s~~~\n", nid, message_recv);
+		// printf("child process: %d, get retrieved_content: %s~~~\n", nid, message_recv);
 		char * p = strstr(message_recv, "retrieved_content");
 		void * start_addr = getFirstAddrFromMsg(p);
 		int received_data_size = 0;
@@ -183,17 +183,7 @@ void child_process_SIGIO_handler(int signum, siginfo_t *si, void *ctx) {
 		assert(space_counter == 3);
 		// save the data to shared memory on allocator
 		memcpy(start_addr, (void *)p, received_data_size);
-
-
-		// char header[100];
-		// sprintf(header, "retrieved_content %p %d ", start_addr, received_data_size);
-		// p = strstr(message_recv, "retrieved_content");
-		// if(p == message_recv) {
-		// 	p += (strlen(header) + received_data_size);
-		//     memcpy(message_recv, p, strlen(p));
-		// } else {
-		//     *p = 0;
-		// }
+		
 		if (strstr(message_recv, "sm_barrier")) {
 			sprintf(message_recv, "sm_barrier", strlen("sm_barrier"));
 		} else {
@@ -370,7 +360,7 @@ void childProcessMain(int node_n, int n_processes, char * host_name,
  			debug_printf("child-process %d, sm_bcast\n", node_n);
 			if (strcmp("sm_bcast_need_sync", (*(child_process_table+node_n)).client_message) != 0) {
 				shared_mem->bcast_addr = getFirstAddrFromMsg((*(child_process_table+node_n)).client_message);
-				printf("shared_mem->bcast_addr: %p", shared_mem->bcast_addr);
+				debug_printf("shared_mem->bcast_addr: %p", shared_mem->bcast_addr);
 			}
 
  			// barrier in sm_bcast

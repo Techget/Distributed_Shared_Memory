@@ -30,8 +30,8 @@ void* create_mmap(int pid){
     exit(0);
   }
 
-  printf("node %d: ..................addr after mmap: %p\n",pid, address);
-  printf("node %d: ............................alloc: %p\n",pid, alloc);
+  // debug_printf("node %d: ..................addr after mmap: %p\n",pid, address);
+  // debug_printf("node %d: ............................alloc: %p\n",pid, alloc);
 
   return alloc;
 }
